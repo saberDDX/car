@@ -77,3 +77,47 @@ car_hello: unloaded
 - 云端只验证了两个摄像头测试程序能编译；尚未完成板卡采集验证。
 
 Qt 整理保持低优先级，驱动首先通过命令行验证。
+
+## 首次板卡构建失败记录：正在诊断
+
+用户已在板卡执行 `make -j2`，构建在内核 headers 的 `prepare` 阶段失败，尚未进入 `car_hello.c` 编译：
+
+- 缺少 `include/generated/asm-offsets.h`。
+- 编译器版本比较命令出现重复双引号，导致 shell 在版本字符串的括号处报语法错误。
+- 内核构建时使用 GCC 10.3.1，板卡当前 GCC 为 11.4.0；版本差异本身通常产生警告，不能据此认定必须更换编译器。
+
+对照 Rockchip `develop-6.1` 源码，ARM64 的 `asm-offsets.h` 还用于获得栈保护相关的结构体偏移，不能创建空文件、填猜测值或关闭栈保护来绕过。
+
+Kconfig 生成的 `.config` 和 `include/config/auto.conf` 对字符串的格式不同：前者带引号，后者写给 Makefile 的值通常不带引号。重复引号可能来自 headers 中配置文件的生成或打包，需要查看板卡实际文件确认。不要全局删除配置文件中的引号。
+
+诊断命令（只读）：
+
+```sh
+KDIR=/lib/modules/$(uname -r)/build
+sed -n '1880,1910p' "$KDIR/Makefile"
+awk '/^(CONFIG_CC_VERSION_TEXT|CONFIG_CC_IS_GCC|CONFIG_GCC_VERSION|CONFIG_MODULES|CONFIG_MODVERSIONS)=/ {print}' "$KDIR/include/config/auto.conf"
+ls -l "$KDIR/include/generated" "$KDIR/scripts/mod/modpost" "$KDIR/kernel/bounds.c" "$KDIR/arch/arm64/kernel/asm-offsets.c"
+dpkg-query -W -f='${Package} ${Version}\n' 'linux-headers*'
+```
+
+板卡反馈进一步确认：`auto.conf` 的编译器字符串确实带引号；生成头文件目录只有 `autoconf.h`、`utsrelease.h` 和 `uapi`；`scripts/mod/modpost`、`kernel/bounds.c`、`arch/arm64/kernel/asm-offsets.c` 都不存在。安装包版本为 `linux-headers-6.1.99-rk3576 6.1.99-rk3576-6`。
+
+结论：当前安装的 headers 树不能直接支持本次外部模块构建；只修复字符串引号不足以恢复环境。需要区分软件包本身没有打包必要文件，还是安装后的文件损坏或丢失。
+
+```sh
+dpkg -V linux-headers-$(uname -r)
+dpkg -L linux-headers-$(uname -r) | awk '/(asm-offsets.h|bounds.h|modpost|Module.symvers)$/ {print}'
+apt-cache policy linux-headers-$(uname -r)
+```
+
+`dpkg -V` 没有输出一般表示它能校验的文件未发现变化，但不证明软件包自身包含构建所需的全部文件。结合文件清单和可用包版本，选择恢复匹配的软件包或获取厂商匹配的内核构建产物。不能用任意一个标为 6.1.99 的源码树替代；补齐构建资料时仍需核对配置和厂商版本。
+
+检查脚本已增加生成头文件、modpost 和编译器字符串格式检查。模块环境尚未通过验收。
+
+源码依据：
+
+- [Rockchip 内核 Kbuild](https://github.com/rockchip-linux/kernel/blob/develop-6.1/Makefile)。
+- [ARM64 构建规则](https://github.com/rockchip-linux/kernel/blob/develop-6.1/arch/arm64/Makefile)。
+- [Kconfig 配置文件生成逻辑](https://github.com/rockchip-linux/kernel/blob/develop-6.1/scripts/kconfig/confdata.c)。
+- [LubanCat 6.1 内核源码](https://github.com/LubanCat/kernel/tree/lbc-develop-6.1)。
+- [LubanCat headers 打包脚本](https://github.com/LubanCat/kernel/blob/lbc-develop-6.1/scripts/package/builddeb)：包括生成头文件、构建工具和 Module.symvers；当前分支源码不是运行镜像精确版本的证明。
