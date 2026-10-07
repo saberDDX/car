@@ -114,6 +114,34 @@ apt-cache policy linux-headers-$(uname -r)
 
 检查脚本已增加生成头文件、modpost 和编译器字符串格式检查。模块环境尚未通过验收。
 
+### 软件包校验结果与恢复步骤
+
+用户提供的 `dpkg -V` 结果包含 991 条缺失项和 38 条文件内容校验不一致记录。其中生成头文件和 `modpost` 确实在已安装包的文件清单中，却在磁盘上缺失；`auto.conf` 和 `autoconf.h` 也有内容变化。因此当前阻塞是本机 headers 安装目录不完整或被改动，不能仅根据这些记录确定是哪次操作造成的。
+
+厂商 APT 源 `https://cloud.embedfire.com/mirrors/ebf-debian` 提供同名包的新修订版 `6.1.99-rk3576-7`，已安装版本为 `6.1.99-rk3576-6`。下一步通过 APT 恢复 headers，保留签名和校验验证。
+
+在板卡运行，先备份当前目录用于保留修改和排查：
+
+```sh
+sudo tar -czf /home/cat/kernel-headers-before-repair-$(date +%Y%m%d-%H%M%S).tar.gz -C /usr/src linux-headers-6.1.99-rk3576
+sudo apt-get install --reinstall --no-remove linux-headers-6.1.99-rk3576=6.1.99-rk3576-7
+```
+
+备份或安装失败时先反馈错误。安装完成后复核：
+
+```sh
+dpkg -V linux-headers-6.1.99-rk3576
+cd ~/car-driver-dev
+git pull --ff-only
+sh scripts/check-board-env.sh
+```
+
+`dpkg -V` 应无异常输出，环境检查应通过，然后重新执行本节前面的 `make -j2` 和 `modinfo ./car_hello.ko`。这次先反馈编译和 modinfo 输出，确认后再加载。新包仍需验证，不因版本名称相同就宣称与运行内核完全匹配。
+
+如果 APT 报索引过期或包文件 404，先运行 `sudo apt-get update`，成功后再安装；遇到签名、证书或校验错误不禁用验证。若新包缺文件或仍无法构建，再依据实际结果处理。
+
+完整 SDK 是源码、工具链和构建资料的集合，不等同于板卡预装的 Ubuntu。此时优先验证 headers 的恢复结果，不要求先下载完整 SDK。
+
 源码依据：
 
 - [Rockchip 内核 Kbuild](https://github.com/rockchip-linux/kernel/blob/develop-6.1/Makefile)。
