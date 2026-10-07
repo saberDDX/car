@@ -87,22 +87,63 @@ cd ~/car-driver-dev && git -c http.version=HTTP/1.1 pull --ff-only && sh scripts
 
 ## 后续硬件验收
 
-完成接线和设备树部署后，使用：
+板卡预检已通过：GPIO4_A6 的 pinmux 输出为 `(MUX UNCLAIMED) (GPIO UNCLAIMED)`，运行设备树具备 gpio4、pinctrl 和 pcfg_pull_up 符号，overlay 离线合并校验 PASS。当前选择文件 `/boot/uEnv/uEnv.txt` 指向 `/boot/uEnv/uEnvLubanCat3.txt`，`enable_uboot_overlays=1`。
+
+### 部署并断电接线
+
+保持未接线，运行下面的命令。只有部署成功才会执行关机，SSH 随关机断开属于正常现象：
+
+```sh
+cd ~/car-driver-dev && git -c http.version=HTTP/1.1 pull --ff-only && sh scripts/deploy-key-overlay.sh && sudo poweroff
+```
+
+脚本再次运行预检，再把 overlay 安装到 `/boot/dtb/overlay/car-lubancat3-gpio4-a6-key.dtbo`。Python 助手确认选择链接和内核版本，备份实际配置文件，在 `#overlay_end` 之前追加一行 `dtoverlay`。保持现有配置、其他 overlay、文件权限和选择链接。先安装 blob，再原子更新引用并读回检查；写入失败时尝试恢复旧文件。重复部署相同内容不会重复添加条目。
+
+配置备份路径会输出，格式是 `/boot/uEnv/uEnvLubanCat3.txt.car-key-backup-时间戳`。如需恢复，使用输出的**确切备份路径**将备份复制回 `/boot/uEnv/uEnvLubanCat3.txt`，保留 `/boot/uEnv/uEnv.txt` 的链接，然后重启。若无法启动，在其他 Linux 环境挂载板卡启动分区后恢复同一文件即可。仅预检不生成这份配置备份。
+
+确认关机后拔掉电源，接 GND→物理 6 脚、K1→物理 7 脚，再上电。没有自动加载模块的设置；本阶段由测试脚本加载和清理。
+
+### 开机后的一条验收命令
+
+```sh
+cd ~/car-driver-dev && sh scripts/test-gpio-key.sh
+```
+
+等每一轮出现 `Verify` 提示再操作：
+
+1. 第一轮按下、松开共 20 次，其中一次按住 3 秒再松开，其余按普通速度操作。长按也包含在这 20 次中。
+2. 达到 20 次后停止操作，程序观察 1 秒并自动结束这一轮，不用 Ctrl+C。
+3. 第二、三轮分别重新加载模块，各长按 3 秒、松开一次。等下一轮提示后再按。
+
+脚本核实运行设备树节点、当前模块版本、platform 设备的 `driver` 和 `of_node` 链接。监视程序按设备名 `car-gpio-key` 查找 event 节点，不假设 event0；验证 KEY_CAMERA/212、交替的按下/松开、精确次数、零重复事件，以及至少一次达到 2 秒的长按。使用单调时钟计算时长；建议按住 3 秒留出余量。
+
+重复按下、松开顺序错误、额外事件、SYN_DROPPED、设备移除、提前 Ctrl+C 或缺少长按都会失败。达到次数之后的观察窗口继续检查事件，避免刚好达到次数就退出而漏掉后续抖动。此测试反映本次人工操作，不宣称所有抖动条件都已覆盖。
+
+每轮卸载后确认模块、driver 绑定和 input 设备消失，下一轮再次读取真实事件。失败或中断时也只清理本次 `run_id` 对应的模块，拒绝卸载已有实例。测试全部成功后模块处于卸载状态。
+
+需要自由查看事件时，仍可运行：
 
 ```sh
 sudo ~/car-driver-dev/tools/key-monitor/key-monitor
 ```
 
-程序按设备名 `car-gpio-key` 查找节点，不假设 event0。按下、松开 20 次后 Ctrl+C，预期按下 20 次、松开 20 次、重复 0 次；运行前让按键处于松开状态。零事件不算通过。队列溢出或设备移除会返回失败。
+此模式使用 Ctrl+C 结束，只打印统计；正式验收使用 `test-gpio-key.sh`。本阶段验证按键驱动，摄像头打开功能将在 Qt 集成阶段接上。
 
-还需验证长按不自动重复，以及驱动卸载、重载 3 次之后仍能读取事件。具体部署和测试脚本将在引脚确定后补充。
+### 云端可重复检查
+
+```sh
+python3 -B -m unittest discover -s tests -v
+make -C tools/key-monitor check
+```
+
+已通过 8 项配置/文件测试，包括保留其他配置及 overlay、重复安装、选择链接与权限、旧 blob 备份、替换配置后模拟 fsync 失败的恢复、拒绝异常链接，以及启动配置长度限制。C 事件验证测试覆盖正常的 20 对事件、长按、重复/额外/乱序事件、错误键码和时间戳。用户态程序用 `-Wall -Wextra -Wpedantic -Werror` 编译通过。这些云端检查不代替板卡上的中断、GPIO 电平和真实 input 验收。
 
 ## 验证状态
 
 - `car_hello` 编译、加载和卸载：板卡已通过。
-- 按键驱动：板卡编译已通过，生成 `car_gpio_key.ko`，vermagic 与运行内核版本一致；绑定 GPIO 和硬件验证待执行。
+- 按键驱动：前一版本在板卡编译已通过，生成 `car_gpio_key.ko`，vermagic 与运行内核版本一致；新版本增加只读 run_id 参数供测试清理使用，下一次部署自动重新编译。绑定 GPIO 和硬件验证待执行。
 - 按键事件监视程序：云端及板卡编译已通过；云端检查了错误路径，真实事件待板卡验证。
-- 设备树和接线：排针映射、无源模块电路已确认；overlay 已在云端使用测试基础树完成编译和离线合并校验，板卡实际符号、引脚占用和启动部署待执行。
+- 设备树和接线：排针映射、无源模块电路已确认；板卡实际符号、引脚空闲和离线合并校验已通过，启动部署、接线和重启后验证待执行。
 - Qt 按键联动：后续实现。
 
 板卡实际型号已由运行设备树确认：`EmbedFire LubanCat-3`，compatible 为 `embedfire,rk3576-lubancat-3` 和 `rockchip,rk3576`。模块中的 OF alias 与自定义 compatible 对应，仍需设备树节点描述硬件才能触发 probe。
@@ -115,6 +156,6 @@ sudo ~/car-driver-dev/tools/key-monitor/key-monitor
 
 对照 [LubanCat 3 配置](https://github.com/LubanCat/kernel/blob/lbc-develop-6.1/arch/arm64/boot/dts/rockchip/uEnv/rk3576/uEnvLubanCat3.txt) 和 [boot.cmd](https://github.com/LubanCat/kernel/blob/lbc-develop-6.1/arch/arm64/boot/dts/rockchip/uEnv/boot.cmd)，厂商启动脚本读取启动分区的 `/uEnv/uEnv.txt`，使用 `enable_uboot_overlays=1` 和 `dtoverlay=/dtb/overlay/文件名.dtbo` 加载覆盖层。Linux 中通常对应 `/boot/uEnv/uEnv.txt`。
 
-这确定了厂商支持的配置路径，但还需检查板卡实际配置和设备树符号。脚本已增加这些字段的采集；原输出只有 uname_r，是旧的字段过滤规则未包含 dtoverlay，不能据此认定所有 overlay 都未启用。
+厂商配置路径、选择链接、overlay 启用状态和所需设备树符号已经在板卡实际输出中核实。原输出只有 uname_r，是旧的字段过滤规则未包含 dtoverlay，不能据此认定所有 overlay 都未启用。
 
-正式部署时需先确认目标物理引脚、当前占用、活动配置路径和符号支持，验证 overlay 能正确合并，再备份并追加配置。保留已有 overlay 和启动参数；当前尚未修改板卡启动配置。
+部署脚本已完成，并在临时目录中验证配置保留、备份及失败恢复；截至用户反馈的预检结果，板卡启动配置仍未修改。

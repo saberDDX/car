@@ -10,7 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
+#include <time.h>
 #include <unistd.h>
+#include "key-verify.h"
 
 static volatile sig_atomic_t stopped;
 
@@ -82,18 +84,51 @@ int main(int argc, char **argv)
 	struct sigaction action;
 	struct pollfd descriptor;
 	unsigned long presses = 0, releases = 0, repeats = 0;
+	struct key_verification verification = { 0 };
+	const char *path = NULL;
+	int verify = 0;
+	long long quiet_until = 0;
 	int fd;
 	int status = EXIT_SUCCESS;
 
-	if (argc > 2) {
-		fprintf(stderr, "Usage: %s [/dev/input/eventN]\n", argv[0]);
+	if ((argc == 3 || argc == 4) && strcmp(argv[1], "--verify") == 0) {
+		char *end;
+
+		errno = 0;
+		verification.target = strtoul(argv[2], &end, 10);
+		if (errno || *end || !verification.target || verification.target > 1000)
+			goto usage;
+		verify = 1;
+		if (argc == 4)
+			path = argv[3];
+	} else if (argc == 2 && argv[1][0] != '-') {
+		path = argv[1];
+	} else if (argc != 1) {
+		goto usage;
+	}
+	fd = path ? open_key(path) : discover_key();
+	if (fd < 0) {
+		if (path)
+			fprintf(stderr, "Cannot open car key %s: %s\n", path, strerror(errno));
 		return EXIT_FAILURE;
 	}
-	fd = argc == 2 ? open_key(argv[1]) : discover_key();
-	if (fd < 0) {
-		if (argc == 2)
-			fprintf(stderr, "Cannot open car key %s: %s\n", argv[1], strerror(errno));
-		return EXIT_FAILURE;
+	if (verify) {
+		unsigned long keys[(KEY_MAX + 1 + sizeof(unsigned long) * 8 - 1) /
+				   (sizeof(unsigned long) * 8)] = { 0 };
+		const unsigned int bits = sizeof(unsigned long) * 8;
+		int clock_id = CLOCK_MONOTONIC;
+
+		if (ioctl(fd, EVIOCSCLOCKID, &clock_id) < 0 ||
+		    ioctl(fd, EVIOCGKEY(sizeof(keys)), keys) < 0) {
+			perror("Cannot initialize key verification");
+			close(fd);
+			return EXIT_FAILURE;
+		}
+		if (keys[KEY_CAMERA / bits] & (1UL << (KEY_CAMERA % bits))) {
+			fprintf(stderr, "Release K1 before starting verification.\n");
+			close(fd);
+			return EXIT_FAILURE;
+		}
 	}
 	memset(&action, 0, sizeof(action));
 	action.sa_handler = stop_monitor;
@@ -107,11 +142,26 @@ int main(int argc, char **argv)
 	setvbuf(stdout, NULL, _IOLBF, 0);
 	descriptor.fd = fd;
 	descriptor.events = POLLIN;
-	printf("Watching car key. Press and release 20 times; Ctrl+C prints totals.\n");
+	if (verify)
+		printf("Verify %lu press/release pairs. Hold one press for 3 seconds; stop pressing after the target.\n",
+		       verification.target);
+	else
+		printf("Watching car key. Press and release 20 times; Ctrl+C prints totals.\n");
 	while (!stopped) {
 		struct input_event events[16];
 		ssize_t bytes;
 		size_t i, count;
+		if (quiet_until) {
+			struct timespec now;
+
+			if (clock_gettime(CLOCK_MONOTONIC, &now) < 0) {
+				perror("clock_gettime");
+				status = EXIT_FAILURE;
+				break;
+			}
+			if ((long long)now.tv_sec * 1000 + now.tv_nsec / 1000000 >= quiet_until)
+				break;
+		}
 		int ready = poll(&descriptor, 1, 1000);
 
 		if (ready < 0) {
@@ -161,6 +211,27 @@ int main(int argc, char **argv)
 			       event->value == 1 ? "pressed" :
 			       event->value == 0 ? "released" :
 			       event->value == 2 ? "repeat" : "unknown");
+			if (verify) {
+				const char *error = key_verify_event(&verification, event);
+
+				if (error) {
+					fprintf(stderr, "%s\n", error);
+					status = EXIT_FAILURE;
+					stopped = 1;
+					break;
+				}
+				if (key_verify_balanced(&verification) && !quiet_until) {
+					struct timespec now;
+
+					if (clock_gettime(CLOCK_MONOTONIC, &now) < 0) {
+						perror("clock_gettime");
+						status = EXIT_FAILURE;
+						stopped = 1;
+						break;
+					}
+					quiet_until = (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000 + 1000;
+				}
+			}
 		}
 	}
 	printf("Totals: pressed=%lu released=%lu repeated=%lu\n", presses, releases, repeats);
@@ -168,6 +239,20 @@ int main(int argc, char **argv)
 		printf("No key presses observed; this run does not validate key behavior.\n");
 		status = EXIT_FAILURE;
 	}
+	if (verify) {
+		const char *error = key_verify_result(&verification);
+
+		if (error || stopped) {
+			fprintf(stderr, "FAIL: %s\n", error ? error : "Verification was interrupted.");
+			status = EXIT_FAILURE;
+		} else if (status == EXIT_SUCCESS) {
+			printf("PASS: %lu pairs, zero repeats, >=2-second hold, and 1-second quiet observation.\n",
+			       verification.target);
+		}
+	}
 	close(fd);
 	return status;
+usage:
+	fprintf(stderr, "Usage: %s [--verify COUNT] [/dev/input/eventN]\n", argv[0]);
+	return EXIT_FAILURE;
 }

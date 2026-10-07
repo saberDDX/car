@@ -11,6 +11,11 @@
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 
+/* A test script only unloads the instance whose read-only token it supplied. */
+static char *run_id = "manual";
+module_param(run_id, charp, 0444);
+MODULE_PARM_DESC(run_id, "Identifier for ownership-safe load/unload testing");
+
 struct car_gpio_key {
 	struct device *dev;
 	struct gpio_desc *button;
@@ -129,8 +134,8 @@ static int car_key_probe(struct platform_device *pdev)
 
 	mod_delayed_work(system_wq, &key->debounce_work,
 			 msecs_to_jiffies(key->debounce_ms));
-	dev_info(dev, "ready: keycode=%u debounce=%u ms irq=%d\n",
-		 key->keycode, key->debounce_ms, irq);
+	dev_info(dev, "ready: keycode=%u debounce=%u ms irq=%d run_id=%s\n",
+		 key->keycode, key->debounce_ms, irq, run_id);
 	return 0;
 }
 
