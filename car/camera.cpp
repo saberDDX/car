@@ -3,9 +3,12 @@
 #include <QHBoxLayout>
 #include <QPalette>
 #include <QDebug>
+#include <QCloseEvent>
 
 Camera::Camera(QWidget *parent) : QWidget(parent) {
     this->setWindowFlags(Qt::Window);
+    setAttribute(Qt::WA_DeleteOnClose);
+    setObjectName("cameraWindow");
     
     QPalette pal = palette();
     pal.setColor(QPalette::Window, Qt::black);
@@ -17,6 +20,7 @@ Camera::Camera(QWidget *parent) : QWidget(parent) {
     label_camera->setMinimumSize(640, 480);
     
     btn_back = new QPushButton("退出倒车影像", this);
+    btn_back->setObjectName("cameraBackButton");
     btn_back->setStyleSheet("background-color: #AA0000; color: white; font-size: 20px; padding: 10px; border-radius: 5px;");
     
     QHBoxLayout *bottomLayout = new QHBoxLayout();
@@ -34,43 +38,29 @@ Camera::Camera(QWidget *parent) : QWidget(parent) {
     });
 
     connect(btn_back, &QPushButton::clicked, this, &Camera::onBackClicked);
-
-    // ================= AI 神经接收端（只听不说） =================
-    m_voiceThread = new VoiceThread(this);
-    connect(m_voiceThread, &VoiceThread::commandReceived, 
-            this, &Camera::onVoiceCommandExecuted, 
-            Qt::QueuedConnection);
-    m_voiceThread->start(); 
-    // ========================================================
+    connect(v4l2Thread, &V4L2Thread::captureError, this, [this](const QString &message) {
+        label_camera->setText(message);
+        label_camera->setStyleSheet("color: white;");
+        qWarning().noquote() << message;
+    });
+    label_camera->setText("正在打开摄像头…");
+    label_camera->setStyleSheet("color: white;");
 
     v4l2Thread->startCapture();
 }
 
 Camera::~Camera() {
-    if(m_voiceThread) {
-        m_voiceThread->stop();
-        m_voiceThread->wait();
-    }
     if(v4l2Thread) {
         v4l2Thread->stopCapture();
     }
 }
 
 void Camera::onBackClicked() {
-    v4l2Thread->stopCapture();   
-    if (this->parentWidget()) {
-        this->parentWidget()->show(); 
-    }
-    this->deleteLater();          
+    close();
 }
 
-void Camera::onVoiceCommandExecuted(QString command) {
-    if (command == "open_camera") {
-        qDebug() << "[Camera UI] 听到打开摄像头，启动 V4L2...";
-        this->show(); 
-        v4l2Thread->startCapture(); 
-    } else if (command == "close_camera") {
-        qDebug() << "[Camera UI] 听到关闭摄像头，执行退出...";
-        onBackClicked(); 
-    }
+void Camera::closeEvent(QCloseEvent *event) {
+    v4l2Thread->stopCapture();
+    emit closed();
+    event->accept();
 }

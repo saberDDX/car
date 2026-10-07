@@ -1,7 +1,8 @@
 #include "camera.h"
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
-#include "ailistenerthread.h"
+#include "inputkeyreader.h"
+#include <QStatusBar>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -30,39 +31,35 @@ MainWindow::MainWindow(QWidget *parent) :
     btn_reverse->setGeometry(20, 20, 150, 50); 
     btn_reverse->setStyleSheet("background-color: rgba(255, 0, 0, 180); color: white; font-weight: bold; font-size: 18px; border-radius: 5px;");
     
-    connect(btn_reverse, &QPushButton::clicked, this, [=](){
-        Camera *cam = new Camera(this);
-        qDebug() << "Simulation: Shift to Reverse Gear!";
-        this->hide(); // 隐藏主界面
-        cam->show();  // 弹出倒车影像界面
+    connect(btn_reverse, &QPushButton::clicked, this, &MainWindow::openCamera);
+    keyReader = new InputKeyReader(this);
+    connect(keyReader, &InputKeyReader::cameraRequested, this, &MainWindow::openCamera);
+    statusBar()->showMessage("按键未连接；可点击倒车影像打开摄像头");
+    connect(keyReader, &InputKeyReader::connectionChanged, this, [this](bool connected) {
+        statusBar()->showMessage(connected ? "按键已连接：K1 打开摄像头" : "按键未连接；可点击倒车影像打开摄像头");
     });
-
-    // --- 新增：AI 语音控制总线接入 ---
-    aiThread = new AiListenerThread(this);
-    connect(aiThread, &AiListenerThread::hardwareCommandReceived, this, [=](const QString &action){
-        qDebug() << ">>> 前台收到 AI 硬件控制指令: " << action;
-        
-        // 如果 AI 判定用户的语音意思是打开摄像头
-        if (action.contains("camera_on")) {
-            Camera *cam = new Camera(this);
-            qDebug() << "AI Command: Voice triggered Reverse Camera!";
-            this->hide(); 
-            cam->show();  
-        }
-    });
-    aiThread->start(); // 启动后台监听
+    keyReader->start();
 }
 
 MainWindow::~MainWindow()
 {
-    // 告诉 AI 监听线程：准备下班了，别再循环了
-    if (aiThread) {
-        aiThread->requestInterruption(); 
-        aiThread->quit();
-        aiThread->wait(); // 等待它把手头最后一次循环走完，安全退出
-    }
-
+    delete cameraWindow.data();
     delete ui;
+}
+
+void MainWindow::openCamera()
+{
+    if (!cameraWindow) {
+        cameraWindow = new Camera(this);
+        connect(cameraWindow.data(), &Camera::closed, this, [this] {
+            cameraWindow = nullptr;
+            show();
+        });
+    }
+    hide();
+    cameraWindow->show();
+    cameraWindow->raise();
+    cameraWindow->activateWindow();
 }
 
 //weather

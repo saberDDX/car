@@ -3,7 +3,7 @@
 # Project created by QtCreator 2021-07-16T17:13:44
 #
 #-------------------------------------------------
-CONFIG += C++11
+CONFIG += c++11
 QT       += core gui network
 
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
@@ -19,7 +19,8 @@ SOURCES += main.cpp\
     music.cpp \
     video.cpp \
     v4l2thread.cpp \
-    camera.cpp 
+    camera.cpp \
+    inputkeyreader.cpp
 
 HEADERS  += mainwindow.h \
     weather.h \
@@ -27,7 +28,8 @@ HEADERS  += mainwindow.h \
     music.h \
     video.h \
     v4l2thread.h \
-    camera.h 
+    camera.h \
+    inputkeyreader.h
 
 FORMS    += mainwindow.ui \
     weather.ui \
@@ -39,7 +41,6 @@ RESOURCES += \
     img.qrc
 
 # 引入 OpenCV 库 
-INCLUDEPATH += /usr/include/opencv4
+isEmpty(OPENCV_INCLUDE_DIR): OPENCV_INCLUDE_DIR = /usr/include/opencv4
+INCLUDEPATH += $$OPENCV_INCLUDE_DIR
 LIBS += -lopencv_core -lopencv_imgproc
-
-LIBS += -lzmq

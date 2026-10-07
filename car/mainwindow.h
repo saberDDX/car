@@ -5,13 +5,14 @@
 #include <QPalette>
 #include <QBrush>
 #include <QDebug>
+#include <QPointer>
 #include "music.h"
 #include "video.h"
 #include "map.h"
 #include "weather.h"
 
-// 提前声明 AI 监听线程类
-class AiListenerThread;
+class InputKeyReader;
+class Camera;
 
 namespace Ui {
 class MainWindow;
@@ -24,6 +25,9 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
+
+public slots:
+    void openCamera();
 
 private slots:
     void on_pushButton_clicked();
@@ -39,8 +43,9 @@ private:
     Video *video;
     Music *music;
 
-    // 新增：AI 监听线程指针
-    AiListenerThread *aiThread = nullptr;
+    // Physical input events share the same camera entry as the GUI button.
+    InputKeyReader *keyReader;
+    QPointer<Camera> cameraWindow;
 };
 
 #endif // MAINWINDOW_H

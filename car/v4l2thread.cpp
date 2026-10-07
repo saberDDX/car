@@ -1,138 +1,253 @@
 #include "v4l2thread.h"
 #include <QDebug>
+#include <QDir>
+#include <QElapsedTimer>
+#include <QFile>
+#include <cerrno>
+#include <climits>
+#include <cstring>
 #include <fcntl.h>
-#include <unistd.h>
+#include <linux/videodev2.h>
+#include <poll.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#include <cstring>
-#include <opencv2/opencv.hpp>
+#include <unistd.h>
+#include <opencv2/core.hpp>
+#include <opencv2/imgproc.hpp>
 
-V4L2Thread::V4L2Thread(QObject *parent) //在 C++ 面向对象的语法里，只要一个函数的名字和类名完全一模一样，而且没有返回值（连 void 都不写），它就不是普通函数，而是构造函数。
-    : QThread(parent), fd(-1), isRunning(false) {
+namespace {
+int cameraIoctl(int fd, unsigned long request, void *argument)
+{
+    int result;
+    do { result = ioctl(fd, request, argument); } while (result < 0 && errno == EINTR);
+    return result;
+}
 }
 
-V4L2Thread::~V4L2Thread() {//析构函数，会被自动执行
-    stopCapture();
-}
+V4L2Thread::V4L2Thread(QObject *parent) : QThread(parent) {}
+V4L2Thread::~V4L2Thread() { stopCapture(); }
 
-void V4L2Thread::startCapture() {
-    if (!isRunning) {
-        isRunning = true;
-        start(); // 这会触发 Qt 底层开启新线程，并自动执行 run()
-    }
-}
-
-void V4L2Thread::stopCapture() {
-    if (isRunning) {
-        isRunning = false;
-        wait(); // 阻塞等待后台线程安全退出，防止内存崩溃
-    }
-}
-
-void V4L2Thread::run() {
-    if (!initCamera()) {
-        qDebug() << "摄像头初始化失败！";
+void V4L2Thread::startCapture()
+{
+    if (isRunning())
         return;
-    }
-
-    qDebug() << "进入摄像头后台抓图死循环...";
-    while (isRunning) {
-        struct v4l2_buffer buf;
-        std::memset(&buf, 0, sizeof(buf));
-        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        buf.memory = V4L2_MEMORY_MMAP;
-
-        // 1. 取出一帧 (DQBUF)
-        if (ioctl(fd, VIDIOC_DQBUF, &buf) >= 0) {
-            
-            // --- 开始跨界转换 ---
-    // A. 将内核映射的内存直接包装成 OpenCV 的 YUYV 矩阵 (零拷贝)
-    cv::Mat yuvMat(480, 640, CV_8UC2, buffers[buf.index].start);
-    cv::Mat rgbMat;
-    
-    // B. 极速转换为 RGB 格式
-    cv::cvtColor(yuvMat, rgbMat, cv::COLOR_YUV2RGB_YUYV);
-    
-    // C. 将 OpenCV 矩阵包装成 Qt 认识的 QImage
-    QImage img((const unsigned char*)(rgbMat.data), 
-               rgbMat.cols, rgbMat.rows, rgbMat.step, 
-               QImage::Format_RGB888);
-               
-    // D. 跨线程发送给前端 UI（注意：必须 copy 深拷贝，否则内存会被后续帧覆盖）
-    emit frameReady(img.copy());
-    // --- 转换结束 ---
-            
-            // 2. 将空盘子还给内核 (QBUF)
-            ioctl(fd, VIDIOC_QBUF, &buf);
-        }
-    }
-
-    releaseCamera();
-    qDebug() << "安全退出摄像头抓图线程";
+    stopRequested.store(false);
+    start();
 }
 
-bool V4L2Thread::initCamera() {
-    // 1. 打开设备节点
-    fd = open("/dev/video0", O_RDWR);
-    if (fd < 0) {
-        qDebug() << "无法打开摄像头设备";
+void V4L2Thread::stopCapture()
+{
+    stopRequested.store(true);
+    wait();
+}
+
+bool V4L2Thread::fail(const QString &operation)
+{
+    emit captureError(operation + ": " + QString::fromLocal8Bit(std::strerror(errno)));
+    return false;
+}
+
+QString V4L2Thread::probeCameraDevice()
+{
+    if (!openCamera())
+        return {};
+    const QString path = selectedDevice;
+    releaseCamera();
+    return path;
+}
+
+bool V4L2Thread::openCamera()
+{
+    const QString explicitPath = qEnvironmentVariable("CAR_CAMERA_DEVICE");
+    QStringList candidates;
+    if (!explicitPath.isEmpty()) {
+        candidates << explicitPath;
+    } else {
+        const QDir stable("/dev/v4l/by-id");
+        for (const QString &entry : stable.entryList({"*-video-index0"}, QDir::Files | QDir::System))
+            candidates << stable.absoluteFilePath(entry);
+        for (const QString &entry : QDir("/dev").entryList({"video*"}, QDir::Files | QDir::System))
+            candidates << "/dev/" + entry;
+    }
+    for (const QString &path : candidates) {
+        const int candidate = ::open(QFile::encodeName(path).constData(), O_RDWR | O_NONBLOCK | O_CLOEXEC);
+        if (candidate < 0) {
+            if (!explicitPath.isEmpty())
+                return fail("无法打开摄像头 " + path);
+            continue;
+        }
+        v4l2_capability caps = {};
+        if (cameraIoctl(candidate, VIDIOC_QUERYCAP, &caps) < 0) {
+            const int saved = errno;
+            ::close(candidate);
+            if (!explicitPath.isEmpty()) { errno = saved; return fail("无法查询摄像头能力"); }
+            continue;
+        }
+        const unsigned int capabilities = caps.capabilities & V4L2_CAP_DEVICE_CAPS ? caps.device_caps : caps.capabilities;
+        const bool uvc = std::strncmp(reinterpret_cast<const char *>(caps.driver), "uvcvideo", sizeof(caps.driver)) == 0;
+        bool yuyv = false;
+        v4l2_fmtdesc format = {};
+        format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        while (cameraIoctl(candidate, VIDIOC_ENUM_FMT, &format) == 0) {
+            if (format.pixelformat == V4L2_PIX_FMT_YUYV)
+                yuyv = true;
+            ++format.index;
+        }
+        if ((explicitPath.isEmpty() && !uvc) || !(capabilities & V4L2_CAP_VIDEO_CAPTURE) ||
+            !(capabilities & V4L2_CAP_STREAMING) || !yuyv) {
+            ::close(candidate);
+            if (!explicitPath.isEmpty()) {
+                emit captureError("此摄像头不支持当前 YUYV 流式采集，请检查设备和格式。");
+                return false;
+            }
+            continue;
+        }
+        fd = candidate;
+        selectedDevice = path;
+        qInfo() << "V4L2 camera selected:" << path;
+        return true;
+    }
+    emit captureError("未找到支持 YUYV 的 USB 摄像头，请检查连接、权限和设备格式。");
+    return false;
+}
+
+bool V4L2Thread::initCamera()
+{
+    if (!openCamera())
+        return false;
+    v4l2_format format = {};
+    format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    format.fmt.pix.width = 640;
+    format.fmt.pix.height = 480;
+    format.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+    format.fmt.pix.field = V4L2_FIELD_ANY;
+    if (cameraIoctl(fd, VIDIOC_S_FMT, &format) < 0)
+        return fail("设置摄像头格式失败");
+    width = format.fmt.pix.width;
+    height = format.fmt.pix.height;
+    stride = format.fmt.pix.bytesperline;
+    if (format.fmt.pix.pixelformat != V4L2_PIX_FMT_YUYV || !width || !height ||
+        width > 4096 || height > 4096 || width % 2 || stride < width * 2 || stride > INT_MAX) {
+        emit captureError("摄像头返回了不支持的图像格式或尺寸。");
         return false;
     }
-
-    // 2. 设置格式 (640x480 YUYV)
-    struct v4l2_format fmt;
-    std::memset(&fmt, 0, sizeof(fmt));//初始化
-    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    fmt.fmt.pix.width = 640;
-    fmt.fmt.pix.height = 480;
-    fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
-    fmt.fmt.pix.field = V4L2_FIELD_INTERLACED;
-    ioctl(fd, VIDIOC_S_FMT, &fmt);//正式下单 VIDIOC_S_FMT：set fmt设置视频格式
-
-    // 3. 申请 4 个内核缓冲区
-    struct v4l2_requestbuffers req;
-    std::memset(&req, 0, sizeof(req));
-    req.count = 4;
-    req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    req.memory = V4L2_MEMORY_MMAP;
-    ioctl(fd, VIDIOC_REQBUFS, &req);//正式下单 VIDIOC_REQBUFS：request buffers申请缓冲区
-
-    // 4. 内存映射 (mmap) 与入队
-    buffers.resize(req.count);//buffers是std::vector创建的动态数组，所以可以这么写  在数组buffers里面创建四个Buffer
-    for (size_t i = 0; i < req.count; ++i) {
-        struct v4l2_buffer buf;
-        std::memset(&buf, 0, sizeof(buf));
-        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        buf.memory = V4L2_MEMORY_MMAP;
-        buf.index = i;
-        
-        ioctl(fd, VIDIOC_QUERYBUF, &buf);
-        
-        buffers[i].length = buf.length;
-        buffers[i].start = mmap(NULL, buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buf.m.offset);//内存映射
-        
-        ioctl(fd, VIDIOC_QBUF, &buf);
+    v4l2_requestbuffers request = {};
+    request.count = 4;
+    request.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    request.memory = V4L2_MEMORY_MMAP;
+    if (cameraIoctl(fd, VIDIOC_REQBUFS, &request) < 0)
+        return fail("申请摄像头缓冲区失败");
+    if (!request.count || request.count > 32) {
+        emit captureError("摄像头返回的缓冲区数量无效。");
+        return false;
     }
-
-    // 5. 开启视频流
-    enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    ioctl(fd, VIDIOC_STREAMON, &type);
-    
-    qDebug() << "摄像头初始化完成，显存通道已打通！";
-
+    buffers.resize(request.count);
+    for (size_t i = 0; i < buffers.size(); ++i) {
+        v4l2_buffer buffer = {};
+        buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        buffer.memory = V4L2_MEMORY_MMAP;
+        buffer.index = i;
+        if (cameraIoctl(fd, VIDIOC_QUERYBUF, &buffer) < 0)
+            return fail("查询摄像头缓冲区失败");
+        void *mapping = mmap(nullptr, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buffer.m.offset);
+        if (mapping == MAP_FAILED)
+            return fail("映射摄像头缓冲区失败");
+        buffers[i].start = mapping;
+        buffers[i].length = buffer.length;
+        if (cameraIoctl(fd, VIDIOC_QBUF, &buffer) < 0)
+            return fail("摄像头缓冲区入队失败");
+    }
+    v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    if (cameraIoctl(fd, VIDIOC_STREAMON, &type) < 0)
+        return fail("启动摄像头失败");
+    streaming = true;
+    qInfo() << "V4L2 streaming:" << width << "x" << height << "stride" << stride;
     return true;
 }
 
-void V4L2Thread::releaseCamera() {
-    if (fd >= 0) {
-        enum v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        ioctl(fd, VIDIOC_STREAMOFF, &type);
-
-        for (size_t i = 0; i < buffers.size(); ++i) {
-            munmap(buffers[i].start, buffers[i].length);
-        }
-        close(fd);
-        fd = -1;
-        qDebug() << "摄像头资源已安全释放";
+void V4L2Thread::run()
+{
+    if (!initCamera()) {
+        releaseCamera();
+        return;
     }
+    QElapsedTimer lastFrame;
+    bool firstFrame = true;
+    lastFrame.start();
+    while (!stopRequested.load()) {
+        pollfd descriptor = {fd, POLLIN, 0};
+        const int ready = poll(&descriptor, 1, 100);
+        if (ready < 0) {
+            if (errno == EINTR)
+                continue;
+            fail("等待摄像头帧失败");
+            break;
+        }
+        if (!ready) {
+            if (lastFrame.elapsed() >= 5000) {
+                emit captureError("摄像头连续 5 秒未返回画面，请检查连接后重新打开。");
+                break;
+            }
+            continue;
+        }
+        if (descriptor.revents & (POLLERR | POLLHUP | POLLNVAL)) {
+            emit captureError("摄像头已断开或采集发生错误，请检查连接后重新打开。");
+            break;
+        }
+        if (!(descriptor.revents & POLLIN))
+            continue;
+        v4l2_buffer buffer = {};
+        buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        buffer.memory = V4L2_MEMORY_MMAP;
+        if (cameraIoctl(fd, VIDIOC_DQBUF, &buffer) < 0) {
+            if (errno == EAGAIN)
+                continue;
+            fail("读取摄像头帧失败");
+            break;
+        }
+        const size_t needed = static_cast<size_t>(height - 1) * stride + width * 2;
+        if (buffer.index >= buffers.size() || buffer.bytesused > buffers[buffer.index].length ||
+            needed > buffers[buffer.index].length || buffer.bytesused < needed) {
+            emit captureError("摄像头帧长度或缓冲区索引无效。");
+            break;
+        }
+        if (!(buffer.flags & V4L2_BUF_FLAG_ERROR)) {
+            try {
+                cv::Mat yuv(height, width, CV_8UC2, buffers[buffer.index].start, stride);
+                cv::Mat rgb;
+                cv::cvtColor(yuv, rgb, cv::COLOR_YUV2RGB_YUYV);
+                QImage image(rgb.data, rgb.cols, rgb.rows, static_cast<int>(rgb.step), QImage::Format_RGB888);
+                emit frameReady(image.copy());
+                if (firstFrame) {
+                    qInfo() << "V4L2 first frame received:" << width << "x" << height;
+                    firstFrame = false;
+                }
+                lastFrame.restart();
+            } catch (const cv::Exception &error) {
+                qWarning() << "Frame conversion failed:" << error.what();
+                emit captureError("摄像头图像转换失败，请重新打开。");
+                break;
+            }
+        }
+        if (cameraIoctl(fd, VIDIOC_QBUF, &buffer) < 0) {
+            fail("摄像头缓冲区重新入队失败");
+            break;
+        }
+    }
+    releaseCamera();
+}
+
+void V4L2Thread::releaseCamera()
+{
+    if (streaming) {
+        v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        cameraIoctl(fd, VIDIOC_STREAMOFF, &type);
+        streaming = false;
+    }
+    for (const Buffer &buffer : buffers)
+        if (buffer.start)
+            munmap(buffer.start, buffer.length);
+    buffers.clear();
+    if (fd >= 0) { ::close(fd); fd = -1; }
+    qInfo() << "V4L2 camera resources released";
 }
