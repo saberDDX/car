@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: GPL-2.0
+/dts-v1/;
+/plugin/;
+
+/* LubanCat-3: physical pin 7 = GPIO4_A6; physical pin 6 = GND.
+ * Numeric cells avoid requiring the full kernel source to compile this overlay.
+ * 1 = GPIO_ACTIVE_LOW; 212 = KEY_CAMERA; mux 0 = RK_FUNC_GPIO.
+ */
+/ {
+	compatible = "embedfire,rk3576-lubancat-3";
+
+	fragment@0 {
+		target-path = "/";
+		__overlay__ {
+			car_camera_key: car-camera-key {
+				compatible = "saberddx,car-gpio-key";
+				button-gpios = <&gpio4 6 1>;
+				linux,code = <212>;
+				debounce-interval = <20>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&car_key_pin>;
+				status = "okay";
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <&pinctrl>;
+		__overlay__ {
+			car-keys {
+				car_key_pin: car-key-pin {
+					rockchip,pins = <4 6 0 &pcfg_pull_up>;
+				};
+			};
+		};
+	};
+};

@@ -41,7 +41,38 @@ git -c http.version=HTTP/1.1 pull --ff-only && sh scripts/prepare-gpio-key.sh
 | debounce-interval | 默认 20，允许 1..1000，单位毫秒 |
 | status | `okay` 启用节点 |
 
-物理排针编号与 GPIO 编号不是一回事。需要确认按键模块引脚、板卡版本和接线，再提供可部署的 overlay，避免占用正在使用的 I2C、串口或其他外设引脚。
+物理排针编号与 GPIO 编号不是一回事。用户提供的 LubanCat-3 官方排针表已确认物理 7 脚为 GPIO4_A6，物理 6 脚为 GND。GPIO4_A6 还能复用为 CAN0_RX_M2、I2C4_SDA_M1 和 UART6_RX_M0；是否空闲仍需在板卡读取实际占用，不能仅凭排针表判断。
+
+## 接线方案与 overlay 预检
+
+先保持模块未接线，运行一条命令：
+
+```sh
+cd ~/car-driver-dev && git -c http.version=HTTP/1.1 pull --ff-only && sh scripts/prepare-key-overlay.sh
+```
+
+脚本执行以下步骤：
+
+1. 编译驱动和监视程序，输出板卡型号、实际启动配置字段及符号信息。
+2. 缺少 `dtc`、`fdtoverlay`、`fdtget` 时，通过系统 apt 安装 `device-tree-compiler`，可能需要输入 sudo 密码。
+3. 读取 debugfs 的 pinmux-pins，检查 pinctrl 编号 134（bank 4、offset 6，即 GPIO4_A6）。仅接受明确的 GPIO 和 mux 都未被申请的输出；占用、缺失或无法识别都会停止。必要时挂载 debugfs，不申请 GPIO 或改变电平。
+4. 导出运行设备树，在 `drivers/gpio-key/build/` 编译 overlay、离线合并，核对 GPIO 引用、有效电平、上拉、键码、消抖和 pinctrl 引用。
+
+此阶段不改 `/boot`，不加载按键模块，不重启。把完整输出反馈后，才能根据实际启动配置准备部署。`PREPARED` 只代表预检和离线合并通过，不代表物理按键已经工作。
+
+预检通过后，断开板卡电源再按下表接线：
+
+| 按键模块 | 板卡物理针脚 | 用途 |
+| --- | --- | --- |
+| GND | 6 | 公共地 |
+| K1 | 7 | GPIO4_A6 输入 |
+| K2、K3、K4 | 不接 | 后续再扩展 |
+
+按板卡丝印的 1 脚标记确定方向，排针编号按 1/2、3/4、5/6、7/8 成对排列；不能凭照片左右方向猜编号。不接 3.3V 或 5V：该模块是无源按键，按下时把 K1 接到 GND。照片标注“不带电容”，仍需驱动的软件消抖。
+
+`drivers/gpio-key/lubancat3-gpio4-a6-key.dts` 使用 `button-gpios = <&gpio4 6 1>`。其中 6 是 GPIO4 内的 offset，不是物理 6 脚；1 表示低电平有效。`rockchip,pins = <4 6 0 &pcfg_pull_up>` 选择 GPIO 功能并开启内部上拉。松开时为高电平，按下时为低电平。
+
+`scripts/build-key-overlay.sh` 也可单独处理导出的基础 DTB。它会检查板卡型号和必要符号，并拒绝向已有本项目节点的设备树重复合并。输出的 `merged-key.dtb` 仅用于检查，不能直接替换板卡完整启动设备树。
 
 没有匹配的设备树节点时，加载模块只会注册驱动，不会执行 `probe`，也不会出现本项目的 input 设备。模块存在和硬件绑定成功是两项不同的检查。
 
@@ -71,12 +102,14 @@ sudo ~/car-driver-dev/tools/key-monitor/key-monitor
 - `car_hello` 编译、加载和卸载：板卡已通过。
 - 按键驱动：板卡编译已通过，生成 `car_gpio_key.ko`，vermagic 与运行内核版本一致；绑定 GPIO 和硬件验证待执行。
 - 按键事件监视程序：云端及板卡编译已通过；云端检查了错误路径，真实事件待板卡验证。
-- 设备树和接线：等待硬件信息。
+- 设备树和接线：排针映射、无源模块电路已确认；overlay 已在云端使用测试基础树完成编译和离线合并校验，板卡实际符号、引脚占用和启动部署待执行。
 - Qt 按键联动：后续实现。
 
 板卡实际型号已由运行设备树确认：`EmbedFire LubanCat-3`，compatible 为 `embedfire,rk3576-lubancat-3` 和 `rockchip,rk3576`。模块中的 OF alias 与自定义 compatible 对应，仍需设备树节点描述硬件才能触发 probe。
 
-用户的按键模块引脚为 K1–K4 和 GND，尚未接线，有母对母杜邦线。先使用 K1 和 GND 两根线；按常见无源独立按键方案配置输入上拉、低电平有效。模块实物和板卡排针图需核对后再确定物理针脚。
+用户的按键模块引脚为 K1–K4 和 GND，尚未接线，有母对母杜邦线。模块图片给出的原理图确认四个按键分别连接公共地，没有 VCC 接口；本阶段只使用 K1 和 GND 两根线。
+
+云端的离线检查覆盖：正常合并、错误板卡型号、缺少 gpio4 符号、错误上下拉属性、重复 overlay，以及 7 种引脚占用输出。测试基础树用于验证脚本和 overlay 逻辑，不代替实际 RK3576 板卡验收。
 
 ## 厂商 overlay 加载方式
 
