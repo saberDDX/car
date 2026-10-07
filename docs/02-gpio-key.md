@@ -69,7 +69,19 @@ sudo ~/car-driver-dev/tools/key-monitor/key-monitor
 ## 验证状态
 
 - `car_hello` 编译、加载和卸载：板卡已通过。
-- 按键驱动：实现已提供，板卡编译和硬件验证待执行。
-- 按键事件监视程序：在云端编译和错误路径检查；真实事件待板卡验证。
+- 按键驱动：板卡编译已通过，生成 `car_gpio_key.ko`，vermagic 与运行内核版本一致；绑定 GPIO 和硬件验证待执行。
+- 按键事件监视程序：云端及板卡编译已通过；云端检查了错误路径，真实事件待板卡验证。
 - 设备树和接线：等待硬件信息。
 - Qt 按键联动：后续实现。
+
+板卡实际型号已由运行设备树确认：`EmbedFire LubanCat-3`，compatible 为 `embedfire,rk3576-lubancat-3` 和 `rockchip,rk3576`。模块中的 OF alias 与自定义 compatible 对应，仍需设备树节点描述硬件才能触发 probe。
+
+用户的按键模块引脚为 K1–K4 和 GND，尚未接线，有母对母杜邦线。先使用 K1 和 GND 两根线；按常见无源独立按键方案配置输入上拉、低电平有效。模块实物和板卡排针图需核对后再确定物理针脚。
+
+## 厂商 overlay 加载方式
+
+对照 [LubanCat 3 配置](https://github.com/LubanCat/kernel/blob/lbc-develop-6.1/arch/arm64/boot/dts/rockchip/uEnv/rk3576/uEnvLubanCat3.txt) 和 [boot.cmd](https://github.com/LubanCat/kernel/blob/lbc-develop-6.1/arch/arm64/boot/dts/rockchip/uEnv/boot.cmd)，厂商启动脚本读取启动分区的 `/uEnv/uEnv.txt`，使用 `enable_uboot_overlays=1` 和 `dtoverlay=/dtb/overlay/文件名.dtbo` 加载覆盖层。Linux 中通常对应 `/boot/uEnv/uEnv.txt`。
+
+这确定了厂商支持的配置路径，但还需检查板卡实际配置和设备树符号。脚本已增加这些字段的采集；原输出只有 uname_r，是旧的字段过滤规则未包含 dtoverlay，不能据此认定所有 overlay 都未启用。
+
+正式部署时需先确认目标物理引脚、当前占用、活动配置路径和符号支持，验证 overlay 能正确合并，再备份并追加配置。保留已有 overlay 和启动参数；当前尚未修改板卡启动配置。

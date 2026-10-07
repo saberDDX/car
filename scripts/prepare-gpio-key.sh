@@ -20,10 +20,28 @@ for property in model compatible; do
         printf '\n'
     fi
 done
-for boot_file in /boot/uEnv/uEnv*.txt /boot/uEnv.txt /boot/extlinux/extlinux.conf; do
+for boot_file in /boot/uEnv/uEnv.txt /boot/uEnv.txt /boot/extlinux/extlinux.conf; do
     if [ -r "$boot_file" ]; then
-        printf 'Boot selection in %s:\n' "$boot_file"
-        awk '/^(uname_r|dtb|dtbo|fdtfile|overlays)=/ || /^[[:space:]]*FDT(OVERLAYS|DIR)?[[:space:]]/ {print}' "$boot_file"
+        printf 'Boot configuration fields in %s:\n' "$boot_file"
+        if command -v readlink >/dev/null 2>&1; then
+            readlink -f "$boot_file"
+        fi
+        awk '/^[[:space:]]*(uname_r|dtb|dtbo|dtoverlay|enable_uboot_overlays|fdtfile|overlays)[[:space:]]*=/ || /^[[:space:]]*FDT(OVERLAYS|DIR)?[[:space:]]/ {print}' "$boot_file"
+    fi
+done
+for tool in dtc fdtoverlay fdtget; do
+    if command -v "$tool" >/dev/null 2>&1; then
+        printf '%s: found\n' "$tool"
+    else
+        printf '%s: not installed\n' "$tool"
+    fi
+done
+for symbol in gpio0 gpio1 gpio2 gpio3 gpio4 pinctrl pcfg_pull_up; do
+    path="/sys/firmware/devicetree/base/__symbols__/$symbol"
+    if [ -r "$path" ]; then
+        printf 'Device tree symbol %s: ' "$symbol"
+        tr '\000' '\n' < "$path"
+        printf '\n'
     fi
 done
 printf 'Build complete. Next: confirm wiring, prepare device tree, and test real input events.\n'
