@@ -32,6 +32,19 @@ modinfo ./car_hello.ko
 
 编译必须正常结束，且生成本次构建的 `car_hello.ko`。`modinfo` 的 vermagic 应包含运行内核的版本。vermagic 相符只是必要条件，仍需检查加载结果。
 
+### 自动执行检查、编译、加载和卸载
+
+更新代码后，在板卡运行：
+
+```sh
+cd ~/car-driver-dev
+git -c http.version=HTTP/1.1 pull --ff-only && sh scripts/test-module.sh
+```
+
+脚本固定使用仓库中的测试模块目录，自动检查、编译、核对 vermagic、加载、卸载和验证本次内核日志。每次加载传入唯一的 `run_id` 模块参数，避免把旧日志当成本次成功的证据。需要权限时 sudo 会在板卡终端请求密码。
+
+脚本只清理自己加载且参数匹配的模块，遇到已经加载的 `car_hello` 会停止。失败返回非零状态；本阶段期待最终出现 `PASS`。只有板卡实际完成脚本才算通过加载/卸载验证，云端的脚本语法检查不能替代它。
+
 ## 加载和卸载
 
 ```sh
@@ -62,6 +75,7 @@ car_hello: unloaded
 - `module_exit` 注册卸载入口；真正的设备驱动在这里或框架回调中清理资源。
 - `pr_info` 写入内核日志，用 `dmesg` 查看。
 - `MODULE_LICENSE` 声明许可证；这里的 GPL 标记对应文件的 GPL-2.0 声明。
+- `module_param` 定义模块参数；示例中的 `run_id` 用于区分本次加载日志，`0444` 表示加载后只读。
 - Makefile 中的 `obj-m` 交给 Kbuild 生成模块；`M` 指定外部模块源码目录。
 - 编译器、内核构建配置、符号版本与运行内核需匹配；不能用版本号相近的 headers 任意替换。
 
@@ -141,6 +155,12 @@ sh scripts/check-board-env.sh
 如果 APT 报索引过期或包文件 404，先运行 `sudo apt-get update`，成功后再安装；遇到签名、证书或校验错误不禁用验证。若新包缺文件或仍无法构建，再依据实际结果处理。
 
 完整 SDK 是源码、工具链和构建资料的集合，不等同于板卡预装的 Ubuntu。此时优先验证 headers 的恢复结果，不要求先下载完整 SDK。
+
+### 恢复后的验证进展
+
+板卡已通过新版环境检查，并实际生成 `car_hello.ko`。用户提供的构建输出包含 CC、MODPOST 和 LD 阶段，`modinfo` 显示 `vermagic: 6.1.99-rk3576 SMP mod_unload aarch64`。编译阶段通过，加载和卸载仍待板卡验证。
+
+GCC 10.3.1 与 11.4.0 的差异在这次构建中产生警告，没有阻止编译。暂不更换工具链；继续依据加载结果判断，不根据 vermagic 单独宣称所有驱动均兼容。
 
 源码依据：
 
