@@ -144,7 +144,7 @@ make -C tools/key-monitor check
 - 按键驱动：新版本在板卡编译、绑定和真实事件验收已通过，含只读 run_id 参数的本次模块生命周期可核对。
 - 按键事件监视程序：板卡第一轮 pressed=20、released=20、repeated=0，长按达到阈值，观察窗口通过；两次卸载重载后的单次长按验证也通过。
 - 设备树和接线：运行节点触发本项目驱动 probe；K1→物理 7 脚、GND→物理 6 脚的硬件链路已由真实事件验证。
-- Qt 按键联动：代码及云端离屏测试已完成，板卡实际画面待验证，见 [03-qt-camera-key.md](03-qt-camera-key.md)。
+- Qt 按键联动：板卡实时画面、重复/长按保持单窗口、退出重开三次已由用户确认通过，见 [03-qt-camera-key.md](03-qt-camera-key.md)。
 
 板卡实际型号已由运行设备树确认：`EmbedFire LubanCat-3`，compatible 为 `embedfire,rk3576-lubancat-3` 和 `rockchip,rk3576`。模块中的 OF alias 与自定义 compatible 对应，仍需设备树节点描述硬件才能触发 probe。
 
