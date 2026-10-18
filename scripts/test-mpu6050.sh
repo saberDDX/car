@@ -141,7 +141,7 @@ printf '\nPASS: MPU6050 identity read 15 times and three load/unload rounds pass
 if [ -n "$data_seconds" ]; then
     printf 'PASS: six-axis reads, ABI/concurrent reads and open-fd unbind/rebind passed.\n'
     printf 'CSV logs: %s\n' "$log_dir"
-    printf 'Module unloaded. Physical plausibility and 5-minute stability still require reviewing real results.\n'
+    printf 'Module unloaded. Review the readings and measured duration above; PASS covers the automated checks.\n'
 else
     printf 'The module is unloaded. Run sh scripts/test-mpu6050-data.sh for six-axis tests.\n'
 fi
