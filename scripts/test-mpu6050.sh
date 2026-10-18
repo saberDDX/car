@@ -1,5 +1,5 @@
 #!/bin/sh
-# Stage 1 real-board test: WHO_AM_I reads and three binding/unbinding rounds.
+# Board test: identity by default; --data [seconds] adds six-axis/ABI tests.
 set -eu
 repo_dir=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 module="$repo_dir/drivers/mpu6050/car_mpu6050.ko"
@@ -8,6 +8,21 @@ node=/sys/firmware/devicetree/base/i2c@2aca0000/mpu6050@68
 driver=/sys/bus/i2c/drivers/car-mpu6050
 test_id="car-mpu-$(date +%s)-$$"
 run_id="$test_id-before-load"
+data_seconds=
+case "${1:-}" in
+    '') ;;
+    --data)
+        [ "$#" -le 2 ] || { printf 'Usage: %s [--data seconds]\n' "$0" >&2; exit 1; }
+        data_seconds=${2:-10}
+        python3 - "$data_seconds" <<'PY'
+import sys
+value = int(sys.argv[1])
+if not 1 <= value <= 3600:
+    raise SystemExit("seconds must be an integer in 1..3600")
+PY
+        ;;
+    *) printf 'Usage: %s [--data seconds]\n' "$0" >&2; exit 1 ;;
+esac
 as_root() {
     if [ "$(id -u)" -eq 0 ]; then "$@"; else sudo "$@"; fi
 }
@@ -50,6 +65,15 @@ if [ -L "$device/driver" ]; then
     exit 1
 fi
 sh "$repo_dir/scripts/check-board-env.sh"
+sh "$repo_dir/scripts/check-build-clock.sh"
+if [ -n "$data_seconds" ]; then
+    # A clean rebuild avoids reusing products made before correcting board time.
+    make -C "$repo_dir/drivers/mpu6050" clean
+    make -C "$repo_dir/tools/mpu6050-monitor" clean
+    make -C "$repo_dir/tools/mpu6050-monitor"
+    log_dir="$repo_dir/build/mpu6050/$test_id"
+    mkdir -p "$log_dir"
+fi
 make -C "$repo_dir/drivers/mpu6050" -j2
 [ "$(modinfo -F name "$module")" = car_mpu6050 ] || exit 1
 case "$(modinfo -F vermagic "$module")" in
@@ -81,13 +105,43 @@ for round in 1 2 3; do
         [ "$identity" = 0x68 ] || { printf 'STOP: unexpected identity.\n' >&2; exit 1; }
         sleep 0.05
     done
+    if [ -n "$data_seconds" ]; then
+        [ "$(readlink -f /sys/class/misc/car_mpu6050/device)" = "$(readlink -f "$device")" ] || {
+            printf 'STOP: misc device belongs to an unexpected client.\n' >&2; exit 1;
+        }
+        wait_count=0
+        while [ ! -c /dev/car_mpu6050 ] && [ "$wait_count" -lt 20 ]; do
+            sleep 0.05
+            wait_count=$((wait_count + 1))
+        done
+        [ -c /dev/car_mpu6050 ] || { printf 'STOP: misc device node missing.\n' >&2; exit 1; }
+        seconds=1
+        if [ "$round" -eq 1 ]; then
+            seconds=$data_seconds
+            printf 'Keep the sensor still for the first 3 seconds, then gently tilt/rotate it. Do not unplug wires.\n'
+        fi
+        as_root "$repo_dir/tools/mpu6050-monitor/mpu6050-monitor" \
+            -s "$seconds" -r 20 -o "$log_dir/round$round.csv"
+        if [ "$round" -eq 3 ]; then
+            owned || exit 1
+            as_root python3 "$repo_dir/scripts/check-mpu6050-abi.py" \
+                --client "${device##*/}" --run-id "$run_id"
+        fi
+    fi
     owned || { printf 'STOP: module ownership changed.\n' >&2; exit 1; }
     as_root rmmod car_mpu6050
-    if [ -d /sys/module/car_mpu6050 ] || [ -L "$device/driver" ] || [ -e "$device/who_am_i" ]; then
+    if [ -d /sys/module/car_mpu6050 ] || [ -L "$device/driver" ] || [ -e "$device/who_am_i" ] ||
+       [ -e /sys/class/misc/car_mpu6050 ]; then
         printf 'STOP: module, binding or diagnostic attribute remains after unload.\n' >&2
         exit 1
     fi
     printf 'Round %s PASS: identity and cleanup verified.\n' "$round"
 done
 printf '\nPASS: MPU6050 identity read 15 times and three load/unload rounds passed.\n'
-printf 'The module is unloaded. Six-axis configuration/data capture is the next stage.\n'
+if [ -n "$data_seconds" ]; then
+    printf 'PASS: six-axis reads, ABI/concurrent reads and open-fd unbind/rebind passed.\n'
+    printf 'CSV logs: %s\n' "$log_dir"
+    printf 'Module unloaded. Physical plausibility and 5-minute stability still require reviewing real results.\n'
+else
+    printf 'The module is unloaded. Run sh scripts/test-mpu6050-data.sh for six-axis tests.\n'
+fi

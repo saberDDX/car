@@ -2,7 +2,7 @@
 
 ## 当前范围
 
-当前驱动完成设备树匹配、适配器能力检查和 WHO_AM_I 读取，并提供只读 sysfs 诊断属性。尚未配置量程或读取六轴数据，尚未实现任务书中的 misc/read 接口。后续扩展同一驱动，不把身份验证等同于六轴采集完成。
+本文记录第一步身份验证，已通过板卡实测。驱动现已扩展六轴配置与 misc/read，新增内容见 [第二步采集与验收](04b-mpu6050-data.md)。原身份诊断接口和测试仍保留，不把身份验证等同于六轴物理数据验收。
 
 ## 已通过的板卡预检
 
@@ -53,7 +53,7 @@ cd ~/car-driver-dev && sh scripts/test-mpu6050.sh
 PASS: MPU6050 identity read 15 times and three load/unload rounds passed.
 ```
 
-结束时模块已卸载。收到真实结果后再进行六轴数据实现。
+用户已提供真实输出：client 为 7-0068，15 次均读出 0x68，三轮绑定、身份读取与卸载通过。结束时模块已卸载。原日志有 Clock skew 警告，六轴测试前先校准板卡时钟并清理重编译。
 
 ## 核心代码和知识点
 
@@ -86,7 +86,8 @@ dtoverlay=/dtb/overlay/car-lubancat3-mpu6050.dtbo
 - 板卡总线与引脚预检：用户实际输出已通过。
 - 云端：Linux 6.1.190 x86_64 headers 下 W=1 模块编译通过；14 项 Python 测试全部通过，无跳过。覆盖原按键安装器回归、保留按键配置、重复部署、失败恢复、真实 dtc/fdtoverlay 合并，以及错误板型、已启用控制器、错误引脚、缺失配置和地址冲突的拒绝路径。
 - 云端未连接板卡，也未实际访问 MPU6050；上述编译不等于 RK3576 板卡编译。板卡脚本会再次用其当前 headers 构建匹配架构和内核的模块。
-- 板卡部署、芯片身份和真实卸载重载：待验证。
-- 六轴数据、量程换算、misc/read、物理动作及 Qt：后续阶段。
+- 板卡部署、芯片身份和真实卸载重载：已通过，15 次身份读取、三轮生命周期。
+- 六轴数据、量程换算、misc/read：已实现，板卡采集与物理动作待验收。
+- Qt 数据页：后续可选。
 
 厂商参考：[I2C7 M1 overlay](https://github.com/LubanCat/kernel/blob/lbc-develop-6.1/arch/arm64/boot/dts/rockchip/overlay/rk3576-lubancat-i2c7-m1-overlay.dts)、[RK3576 pinctrl](https://github.com/LubanCat/kernel/blob/lbc-develop-6.1/arch/arm64/boot/dts/rockchip/rk3576-pinctrl.dtsi)。

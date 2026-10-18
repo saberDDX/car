@@ -6,6 +6,6 @@
 - [模块编译、加载与卸载基线](docs/01-driver-baseline.md)：板卡已通过。
 - [GPIO 按键驱动、设备树与硬件验收](docs/02-gpio-key.md)：20 次按下/松开、长按及卸载重载已通过。
 - [K1 打开 Qt 摄像头及对应知识点](docs/03-qt-camera-key.md)：板卡实时画面、单窗口及三次关闭重开已通过。
-- [MPU6050 与 I2C 开发](docs/04-mpu6050.md)：引脚预检已通过；[芯片身份驱动、接线和部署测试](docs/04a-mpu6050-bringup.md)已准备，等待真实通信验证。
+- [MPU6050 与 I2C 开发](docs/04-mpu6050.md)：板卡已通过 15 次身份读取及三轮加载/卸载；[六轴采集与 misc/read](docs/04b-mpu6050-data.md)已实现，等待板卡数据验收。
 
-原 Qt 项目位于 `car/`，驱动位于 `drivers/`。运行新 Qt 程序时，在板卡 VNC 桌面的终端执行 `sh scripts/run-car-gui.sh`；编译输出放在 `build/qt/`。MPU6050 先验证 I2C 身份，再扩展六轴采集；DHT11 与大模型语音模块暂缓。
+原 Qt 项目位于 `car/`，驱动位于 `drivers/`。运行新 Qt 程序时，在板卡 VNC 桌面的终端执行 `sh scripts/run-car-gui.sh`；编译输出放在 `build/qt/`。MPU6050 当前先验收命令行采集，Qt 数据页低优先级；DHT11 与大模型语音模块暂缓。
