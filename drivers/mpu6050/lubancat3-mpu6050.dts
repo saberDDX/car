@@ -1,0 +1,27 @@
+// SPDX-License-Identifier: GPL-2.0
+/dts-v1/;
+/plugin/;
+
+/* Physical 3 = SDA/GPIO3_A1; physical 5 = SCL/GPIO3_A0.
+ * Reuse the vendor's I2C7 M1 pin group. AD0 must be low for address 0x68.
+ */
+/ {
+	compatible = "embedfire,rk3576-lubancat-3";
+	fragment@0 {
+		target = <&i2c7>;
+		__overlay__ {
+			status = "okay";
+			clock-frequency = <100000>;
+			pinctrl-names = "default";
+			pinctrl-0 = <&i2c7m1_xfer>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			mpu6050@68 {
+				compatible = "saberddx,car-mpu6050";
+				reg = <0x68>;
+				status = "okay";
+			};
+		};
+	};
+};
