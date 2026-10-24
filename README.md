@@ -3,6 +3,8 @@
 
 驱动开发使用 `dev/driver-baseline` 分支，目标板卡为野火 LubanCat-3（RK3576、Linux 6.1.99、Ubuntu 22.04、Qt 5.15）。
 
+[完整项目清单与验收状态](docs/00-project-inventory.md) · [RK3576 BSP 衍生任务与当前进度](docs/05-rk3576-bsp-practice.md)
+
 - [模块编译、加载与卸载基线](docs/01-driver-baseline.md)：板卡已通过。
 - [GPIO 按键驱动、设备树与硬件验收](docs/02-gpio-key.md)：20 次按下/松开、长按及卸载重载已通过。
 - [K1 打开 Qt 摄像头及对应知识点](docs/03-qt-camera-key.md)：板卡实时画面、单窗口及三次关闭重开已通过。

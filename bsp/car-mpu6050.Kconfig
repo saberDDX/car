@@ -1,0 +1,7 @@
+config CAR_MPU6050
+	tristate "Car MPU6050 sensor driver"
+	depends on I2C
+	help
+	  MPU6050 I2C client driver with a read-only misc interface.
+	  Uses compatible "saberddx,car-mpu6050". This is the car
+	  project's teaching driver, not the standard IIO driver.
