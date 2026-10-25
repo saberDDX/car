@@ -1,0 +1,25 @@
+{
+  "release": "6.1.99-rk3576-car-bsp",
+  "architecture": "AArch64",
+  "module_count": 256,
+  "board_model": "EmbedFire LubanCat-3",
+  "files": {
+    "arch/arm64/boot/Image": {
+      "bytes": 43057664,
+      "sha256": "75387713f8cf3c282c76e17c356c6625a07b90af41013abe5148e8f13f216d5d"
+    },
+    "drivers/misc/car_mpu6050/car_mpu6050.ko": {
+      "bytes": 84192,
+      "sha256": "3b1442ff72eb4d38c7da6c2bbae0f94c06a00c829714c75997afd689a1a590bd"
+    },
+    "arch/arm64/boot/dts/rockchip/rk3576-lubancat-3.dtb": {
+      "bytes": 306930,
+      "sha256": "ad6dffba0a66463f6b9bb6fdc9a857c51d059904f636f45043e6e353f3729b96"
+    },
+    ".config": {
+      "bytes": 226709,
+      "sha256": "b0c802a32624c919331ba1df6f852e28aa021fa5ab70d350c8d89c56a7307821"
+    }
+  },
+  "scope": "Offline artifact validation only; not installed or boot-tested."
+}
