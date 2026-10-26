@@ -152,4 +152,19 @@ Flash CS:      0
 
 为避免浏览器保存同名脚本为 `(1)` 后又运行旧版，提供单独下载副本 `build/bsp/check-bsp-boot-readback-v2.ps1`，内容与仓库主脚本相同。用户无需重新导出板卡，仅用新版对现有两个 Windows 文件复核并返回完整输出。若原始 SHA256 也不符，继续保留阻塞并找回最初备份，不把新导出直接当成已验证原备份。
 
+### 弹窗启动命令错误与自动启动入口
+
+用户随后返回的新错误位于外层文件选择器命令：`Title` 被填入带两层双引号的路径，导致 ParserError；最后的 if 块又缺少结束右花括号，出现 `>>` 等待补完输入。这一轮尚未运行核心校验脚本，也没有新的备份哈希或文件系统检查结果。应先 Ctrl+C 退出未完成输入。
+
+为避免继续手动编辑路径，提供一行自动下载并启动的命令，记录在云端 `build/bsp/windows-boot-check-command.txt`。入口将固定提交 `4826d94ccea36d6f31727e7a0984b2091b1b86d3` 的校验脚本下载到当前 Windows TEMP，先尝试 GitHub raw，失败时尝试 jsDelivr 对应同一公开提交的副本；两者均必须通过 SHA256 `e905c73ca2172911333cd091fc882ca7eaf33b017a3870a6a07e47e14130f73d` 才启动。失败时不运行未知内容，不要求复制到特定 Downloads 文件名或修改 PowerShell Title。随后仍用脚本内部两个文件选择器选真实导出和原始备份。
+
+本轮在工作区内提取微软官方源的便携 PowerShell 7.4.19（未安装到系统目录），用 `tests/test_bsp_windows_readback.py` 对真实 PowerShell 引擎执行 8 项合成镜像检查：原 gzip、原 raw、重新压缩、错误备份及诊断、仅挂载时间改变、导出 magic/UUID 错误、GPT 大小误选、超长 gzip 拒绝，全部通过。测试只在临时脚本副本中替换为合成镜像的已知哈希，发布脚本仍严格保留真实板卡快照哈希。
+
+同一自动入口的下载/哈希阶段也已在云端 PowerShell 实际通过；未在云端启动 Windows 弹窗，不能据此声称 Windows PowerShell 5.1 或用户网络已实测通过。实际 Windows 完整检查仍待用户返回。测试命令：
+
+```sh
+BSP_PWSH=/workspace/.powershell-check/root/opt/microsoft/powershell/7/pwsh \
+  python3 -m unittest discover -s tests -p 'test_bsp_windows_readback.py' -v
+```
+
 PDF 展示的是完整 update 固件升级，没有提供我们 128MiB boot 分区镜像的定点写回流程。不能把 original-boot.img 当完整固件、从扇区 0 写入。GPT 已验证 boot 几何，后续仍需完成完整读回核对并明确“下载镜像”页面的地址写入操作；高级功能导出框和下载页面的地址框不能仅凭相似外观就假定进制相同。本文目前不提供写入命令。
