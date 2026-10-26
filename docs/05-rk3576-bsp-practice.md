@@ -34,13 +34,15 @@
 | 5. 排障 | 准备可恢复的模块匹配实验和日志检查 | 判断“有 client 无绑定”与 probe 失败的区别 | 待集成验证后执行 |
 | 6. 归档 | 更新验收记录、知识点与项目清单 | 口述构建—启动—绑定流程 | 进行中，不能提前写为完成 |
 
-## 现在在板卡执行
+## 已执行的板卡只读检查（无需重复）
 
 ```sh
 cd ~/car-driver-dev && git -c http.version=HTTP/1.1 pull --ff-only && python3 scripts/inspect-bsp-deployment.py
 ```
 
 脚本读取当前 boot 空间、Image/initrd 大小与链接、initrd 内模块版本、initramfs 工具和相关配置，并在有限目录中寻找已有 loader 文件名。只在项目 `build/bsp/deployment-inputs.txt` 保存报告，不写 `/boot`、不加载驱动、不安装软件、不重启。
+
+用户已返回报告及原始 initrd。匹配新内核的独立 initrd 和含 initrd 的新离线包已完成，见 [initrd 分析与实际产物](05d-bsp-deployment-layout.md)。尚未修改板卡启动文件，下一步为核对 Windows 工具高级功能和 Recovery/LOADER 回退通道。
 
 报告中的 unavailable/找不到软件包可以是正常调查结果，保留原输出。不会输出整个环境变量、完整内核命令行或硬件序列号。文件存在不证明启动加载器真的使用它，需要后续与启动日志或厂家脚本对照。
 

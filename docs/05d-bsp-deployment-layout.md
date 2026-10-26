@@ -49,6 +49,47 @@ sha256sum build/bsp/original-initrd-6.1.img
 
 启动脚本会先尝试 `initrd-${uname_r}`，之后再尝试 `${initrd}`。最终选择应让两次读取一致，或明确避免后一次覆盖；不只改 `uname_r`。
 
+## 原 initrd 实际分析与新产物
+
+用户上传的 `original-initrd-6.1.img` 与板卡输出 SHA256 完全一致：
+
+```text
+a866ace9754b86b9fd552ecfe16f14de5386246f8bf2e537b28634916d55768a
+```
+
+- legacy image 头部 CRC、payload 长度与 CRC 均通过；type=3（ramdisk），compression=1（gzip）。实际不是当前 initramfs 配置文件里的 zstd。
+- gzip 解压后为 18,505,216-byte newc cpio，包含 357 项。检查采用内存解析，没有运行镜像中的脚本或二进制。
+- `/init` 及 `/scripts` 使用 Ubuntu initramfs-tools 的挂载根分区、udev 和 run-init 流程；所检查的 init/scripts/conf 内容没有硬编码 `6.1.84`。
+- `/lib` 链接到 `usr/lib`。模块目录为 `usr/lib/modules/6.1.84`，仅包含一个可加载模块 `kernel/drivers/net/usb/cdc_eem.ko`，其余为模块索引。发现旧目录本身不能证明原系统启动有故障，也不能靠改目录名解决模块 ABI。
+- 新内核的 CDC_EEM=m，依赖 USB_USBNET 等均内建；完整 modules.dep 核对该模块没有其他可加载模块依赖。使用本次新内核实际构建并剥离的 AArch64 cdc_eem.ko，再用 depmod 生成新的最小模块索引。
+
+新增 `scripts/prepare-bsp-initrd.py`：只接受上述已审核 SHA256 的原镜像，完整保留 339 项非模块记录的内容和 cpio 元数据，替换旧模块子树，重算 gzip 与 legacy image 头。保留原头的 ARM 架构字段作为该 BSP 的封装惯例；不会据此把实际 AArch64 用户程序或模块改为 32 位。
+
+云端 SDK 准备好后可复现（输出已存在时拒绝覆盖）：
+
+```sh
+. bsp/cloud-env.sh
+python3 scripts/prepare-bsp-initrd.py \
+  build/bsp/original-initrd-6.1.img \
+  build/bsp/stage/lib/modules/6.1.99-rk3576-car-bsp \
+  build/bsp/initrd-6.1.99-rk3576-car-bsp \
+  --depmod /workspace/bsp-sdk/root/usr/bin/depmod
+```
+
+实际新产物：
+
+| 项目 | 结果 |
+| --- | --- |
+| 新 initrd | `build/bsp/initrd-6.1.99-rk3576-car-bsp`，8,464,152 bytes |
+| 新 SHA256 | b3d8ef3de3ef0fbf32630f3165c426f5a8fe36dca6d1912be77d5511dbaa6c4b |
+| 内部记录 | 358 项，仅保留新 release 的早期模块目录，原非模块记录逐字节比对一致 |
+| 新预算 | 65,904,640 − 43,057,664 − 306,930 − 8,464,152 = 14,075,894 bytes，约 13.42 MiB，未扣额外文件系统开销 |
+| 检查 | CRC、序列化读回、gzip/newc、AArch64 模块/vermagic、原记录保留通过 |
+
+新增包含配套 initrd 的离线包 `build/bsp/car-bsp-artifacts-with-initrd.tar.gz`，29,094,301 bytes，SHA256 为 `a7e612fe27e8151abd5d85c37accc67f24045d02891b9ab09658a503ddeee6e5`。原先不含 initrd 的包仍保留，未改写。新包有 257 个匹配模块，包内文件哈希和模块架构/vermagic 已核对；既不是安装器，也不包含启动切换配置、headers 或恢复工具，不能直接覆盖解压到板卡 `/`。
+
+`tests/test_bsp_initrd.py` 检查镜像读写、损坏 CRC、cpio 路径/截断/隐藏数据拒绝、解压大小限制和仅替换模块子树；连同已有 BSP 输入检查共 9 项通过。此结果只证明离线构造与检查，不等同于新 initrd 已在实板启动。
+
 ## 回退通道的收敛方向
 
 Windows boot 备份校验、MASKROM 识别和退出后旧系统启动已通过。本次不修改 U-Boot、分区表或根文件系统，优先调查官方 Recovery 按键进入的 LOADER 通道：若现有 U-Boot 可提供 eMMC 访问，boot 分区恢复可能不需要另找 MASKROM 下载用 loader。此方向还未实测，不能标为可用。
@@ -60,5 +101,6 @@ Windows boot 备份校验、MASKROM 识别和退出后旧系统启动已通过�
 ## 当前状态
 
 - 已完成：ARM64 构建、离线模块/DTB/overlay 检查、boot 备份、Windows SHA256 校验、MASKROM 识别、返回原系统、上述部署输入检查。
-- 进行中：initrd 内容核对、Recovery/LOADER 定点回退方法和最终空间预算。
+- 已进一步完成：initrd 内容分析、匹配模块替换和独立新 initrd、含 initrd 的离线包、实际文件大小预算。
+- 进行中：Recovery/LOADER 定点回退方法、最终部署时的可用空间复核。用户当前提供的是“下载镜像”页截图，“高级功能”页控件仍需核对。
 - 未执行：新内核安装、启动切换、实板回归或分区恢复。

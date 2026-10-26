@@ -1,0 +1,23 @@
+{
+  "source_sha256": "a866ace9754b86b9fd552ecfe16f14de5386246f8bf2e537b28634916d55768a",
+  "source_bytes": 8436090,
+  "source_module_release": "6.1.84",
+  "source_module_files": [
+    "cdc_eem.ko"
+  ],
+  "release": "6.1.99-rk3576-car-bsp",
+  "output_bytes": 8464152,
+  "output_sha256": "b3d8ef3de3ef0fbf32630f3165c426f5a8fe36dca6d1912be77d5511dbaa6c4b",
+  "legacy_format": {
+    "os": 5,
+    "architecture": 2,
+    "type": 3,
+    "compression": 1
+  },
+  "preserved_non_module_entries": 339,
+  "output_cpio_entries": 358,
+  "early_module_sha256": "07c0e33991b4b77f660992efc05fdde418c74e50e0b02f597b4dab285fba9905",
+  "boot_free_bytes_before": 65904640,
+  "projected_free_bytes_after_image_dtb_initrd_before_fs_overhead": 14075894,
+  "scope": "Offline checks only; boot selector unchanged; not boot-tested."
+}

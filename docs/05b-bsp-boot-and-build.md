@@ -87,6 +87,8 @@ DTB 完全相同提高了候选源码对应关系的可信度，但不证明整�
 
 `build/bsp/car-bsp-artifacts.tar.gz` 为离线产物包，含独立命名 Image、基础 DTB、剥离调试信息的模块、模块依赖索引和来源信息；不包含 initramfs、内核开发 headers、启动切换配置或安装脚本。包内 SHA256SUMS 校验打包后的文件，原始构建记录中的模块哈希则对应剥离前文件。
 
+后续收到原 initrd 并完成审核后，另生成包含匹配 initrd 的 `car-bsp-artifacts-with-initrd.tar.gz`，未覆盖上述原包。详细格式、保留范围、测试和哈希见 [部署布局与 initrd 结果](05d-bsp-deployment-layout.md)。
+
 **不要将该压缩包直接覆盖解压到板卡根目录。** 这不是已验收的系统升级包，也不能在旧内核上加载新版本模块。
 
 ### 下一步
