@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-26",
+  "source": "User-provided tail of test-bsp-runtime.sh output after real experimental kernel boot",
+  "release": "6.1.99-rk3576-car-bsp",
+  "script_final_result": "PASS",
+  "configuration_tree_bindings": "Script reported PASS; initial JSON not pasted by user",
+  "mpu6050": {
+    "samples": 200,
+    "read_errors": 0,
+    "elapsed_seconds": 10.001,
+    "target_hz": 20.0,
+    "actual_hz": 19.999,
+    "host_interval_ms": {
+      "min": 49.683,
+      "mean": 50.002,
+      "max": 50.305
+    },
+    "reported_acceleration_norm_g_range": [
+      1.017,
+      1.055
+    ],
+    "reported_chip_temperature_c_range": [
+      30.29,
+      30.36
+    ],
+    "csv": "build/bsp/car-bsp-runtime-1793018854-3658/mpu6050.csv"
+  },
+  "key": {
+    "event_device": "/dev/input/event6",
+    "code": 212,
+    "pressed": 3,
+    "released": 3,
+    "repeated": 0,
+    "hold_at_least_seconds": 2,
+    "quiet_observation_seconds": 1,
+    "result": "PASS"
+  },
+  "pending": [
+    "Qt live video visual verification",
+    "Controlled platform matching-failure exercise"
+  ],
+  "limitations": [
+    "This is a 10-second functional regression, not the earlier 5-minute stability test.",
+    "No calibration/measurement-accuracy or hard-real-time claim.",
+    "Camera enumeration alone does not verify video streaming."
+  ]
+}

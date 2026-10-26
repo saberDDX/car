@@ -8,7 +8,7 @@
 
 ## 已确认的条件
 
-**最新进度：**ARM64 Image、256 个内核模块、基础 DTB、新内核 GPIO 模块及配套 initrd 已生成，两个 overlay 离线合并通过。Windows 原备份双重哈希、MASKROM/LOADER、GPT 和完整 boot 读回身份/几何检查已通过。用户已完成真实 stage、activate/reboot，运行版本与 uEnv 均确认为 `6.1.99-rk3576-car-bsp`，新内核真实启动通过。下一步为 [运行配置和外设回归](05f-bsp-runtime-regression.md)；匹配排障与实际分区恢复尚未执行。
+**最新进度：**ARM64 构建、驱动集成、独立安装、实验内核真实启动以及新内核配置/运行树/绑定检查已通过。新内核 MPU6050 200 组零读取错误、约 20Hz，GPIO 3 对事件/长按/零重复通过，见 [外设回归](05f-bsp-runtime-regression.md)。待新内核摄像头视觉确认和 [可恢复匹配排障](05g-bsp-key-match-debug.md)实测；实际分区恢复仍未执行。
 
 完整运行配置与启动脚本已导出并完成分析，具体历史调查见 [板卡调查结果](05a-bsp-board-findings.md)。最新部署检查确认 `/boot` 可用 65,904,640 bytes，原 initrd 为带 legacy U-Boot 头的 8,436,090-byte 镜像；详细预算和后续输入见 [部署布局调查](05d-bsp-deployment-layout.md)。
 
@@ -28,10 +28,10 @@
 | --- | --- | --- | --- |
 | 0. 可行性 | 源码与候选配置调查、只读采集脚本 | 将 boot 备份保存到 Windows 并校验、确认恢复条件 | 板卡 128MiB boot 备份、Windows 副本校验和 MASKROM 识别已完成；定点恢复未验证 |
 | 1. 构建 | 固定版本、准备工具链及可重复构建命令，整理产物 | 看懂配置来源、架构与交叉编译参数 | ARM64 Image、256 个模块、DTB 已构建和离线验证 |
-| 2. 集成 | 准备可审阅补丁，处理目录和头文件路径 | 对照 `CONFIG_CAR_MPU6050=m` 与 Kconfig/Makefile | 已通过完整源码树构建；新内核运行待验证 |
-| 3. 设备树 | 核对基础树与现有 overlay，避免重复节点 | 对照一次 reg/compatible/pinctrl | 新 DTB 与原 DTB 哈希相同，两个 overlay 离线合并通过 |
-| 4. 启动 | 准备独立文件安装、uEnv 两行切换、Linux 回退和 Windows 预案 | 返回运行版本，执行外设回归 | 真实 stage/activate/reboot 通过，实验内核已运行；外设回归待执行 |
-| 5. 排障 | 准备可恢复的模块匹配实验和日志检查 | 判断“有 client 无绑定”与 probe 失败的区别 | 待集成验证后执行 |
+| 2. 集成 | 准备可审阅补丁，处理目录和头文件路径 | 对照 `CONFIG_CAR_MPU6050=m` 与 Kconfig/Makefile | 完整构建及新内核配置/intree/绑定/采集检查通过 |
+| 3. 设备树 | 核对基础树与现有 overlay，避免重复节点 | 对照一次 reg/compatible/pinctrl | 离线合并与新内核运行树检查通过 |
+| 4. 启动 | 准备独立文件安装、uEnv 两行切换、Linux 回退和 Windows 预案 | 返回运行版本，执行外设回归 | 新内核运行、MPU/GPIO 回归通过，摄像头视觉结果待确认 |
+| 5. 排障 | 准备 platform driver_override 故障和恢复工具 | 判断“有设备无绑定”与 probe 失败的区别，按一次键确认恢复 | 工具及 8 项模拟检查完成，待实板执行 |
 | 6. 归档 | 更新验收记录、知识点与项目清单 | 口述构建—启动—绑定流程 | 进行中，不能提前写为完成 |
 
 ## 已执行的板卡只读检查（无需重复）
