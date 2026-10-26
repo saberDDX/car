@@ -10,7 +10,7 @@
 
 **最新进度：**[完整运行配置与启动分析、ARM64 构建结果](05b-bsp-boot-and-build.md)已完成。新 Image、256 个内核模块、基础 DTB 及新内核的 GPIO 按键模块已生成，两个 overlay 的离线合并通过；新内核尚未上板启动。2026-10-26 用户确认 Windows 备份副本校验一致、RKDevTool v3.37 识别 MASKROM、退出后旧系统恢复正常连接，见 [USB 实测记录](05c-windows-usb-recovery-check.md)。定点恢复方法和部署布局仍待确认。
 
-完整运行配置与启动脚本已导出并完成分析，具体历史调查见 [板卡调查结果](05a-bsp-board-findings.md)。板卡 `/boot` 上次仅约 63MB 空闲，当前需核对实际 initrd 大小和剩余空间，不能只根据旧报告选定新内核部署方案。
+完整运行配置与启动脚本已导出并完成分析，具体历史调查见 [板卡调查结果](05a-bsp-board-findings.md)。最新部署检查确认 `/boot` 可用 65,904,640 bytes，原 initrd 为带 legacy U-Boot 头的 8,436,090-byte 镜像；详细预算和后续输入见 [部署布局调查](05d-bsp-deployment-layout.md)。
 
 - 实板此前信息：LubanCat-3 / RK3576、aarch64、Ubuntu 22.04.5、6.1.99-rk3576。
 - 初始只有板卡和现有连接；现已具备 Windows RKDevTool、MASKROM 识别和电脑上的 boot 备份。尚未完成定点恢复验证，SSH/VNC 可用本身不代表新内核启动失败后可以恢复。
