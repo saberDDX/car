@@ -25,7 +25,7 @@ PDF 页脚 revision 为 3be85a6，更新时间 2026-10-23。该 PDF 以图像形
 1. 在官方资源“6-开发软件”中下载 DriverAssistant 和 RKDevTool（选 v3.32 或符合官方要求的新版本）。
 2. 解压 DriverAssistant，运行 DriverInstall.exe，点击驱动安装。若已存在旧版或安装报冲突，再按官方说明处理旧版驱动，不默认卸载无关驱动。
 3. 解压 RKDevTool，运行 RKDevTool.exe；无需额外安装该应用。
-4. 确认 boot 备份的 original-boot.img.gz 和 manifest.txt 已下载到 Windows，副本 SHA256 应与板卡报告一致。此项尚未收到用户确认。
+4. 将 boot 备份的 original-boot.img.gz 和 manifest.txt 下载到 Windows，计算副本 SHA256 并与板卡报告比较。用户已确认压缩镜像比较结果为 True，见下方实测记录。
 
 ## 识别步骤（依据 PDF 第 10 页）
 
@@ -41,8 +41,20 @@ PDF 页脚 revision 为 3be85a6，更新时间 2026-10-23。该 PDF 以图像形
 
 ## 当前验收状态与后续缺口
 
-- 已确认：官方接口位置、工具版本要求、按键进入方式。
-- 待用户验证：Windows 备份副本校验、驱动安装、MASKROM 识别、退出后旧系统正常启动。
+- 已确认：官方接口位置、工具版本要求、按键进入方式，以及下述实板结果。
 - 未完成：boot 分区定点恢复的工具操作、必要的 loader 文件及回退演练。
+
+### 2026-10-26 用户验证
+
+- Windows 使用 RKDevTool v3.37，用户截图底部明确显示“发现一个 MASKROM 设备”，设备列表显示 MASKROM。此版本满足官方要求，已证实当前数据线、OTG 接口与 Windows 驱动组合能识别设备。
+- 用户运行 PowerShell 比较 Windows 压缩备份 SHA256，返回“与板卡报告一致: True”。期望值为 `6fa3cc6ca8ce04684c74d66897a9345e9e5333e101553eea84ec157fa1d9679a`。
+- 用户退出 MASKROM、正常重新上电后，确认能再次通过 VS Code 连接板卡。
+- 未执行分区写入或恢复。这些结果不能替代实际恢复验收。
+
+### 下一步只读检查
+
+在板卡运行 `python3 scripts/inspect-bsp-deployment.py`，读取当前 boot 空间、镜像/initrd 大小和链接、initrd 内模块版本、initramfs 工具与相关配置，以及有限目录中已有 loader 文件名。仅写项目内 `build/bsp/deployment-inputs.txt` 报告，不修改系统文件。
+
+该报告用于判断新内核的独立 Image、模块与 initrd 布局；脚本不安装产物、不切换启动、不证明恢复流程已具备。若找到了 loader，也必须另行核对其来源与板卡兼容性。
 
 PDF 展示的是完整 update 固件升级，没有提供我们 128MiB boot 分区镜像的定点写回流程。不能把 original-boot.img 当完整固件、从扇区 0 写入。已记录分区起始扇区 32768（512 字节单位），但具体工具地址单位、目标存储及 loader 流程还需进一步核对，本文不提供写入命令。
