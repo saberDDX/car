@@ -167,4 +167,12 @@ BSP_PWSH=/workspace/.powershell-check/root/opt/microsoft/powershell/7/pwsh \
   python3 -m unittest discover -s tests -p 'test_bsp_windows_readback.py' -v
 ```
 
+### Windows 实际完整读回检查通过
+
+用户随后返回自动入口的实际输出，明确选择的原备份压缩文件为 25,850,532 bytes。压缩 SHA256 为已知 `6fa3cc6c…`，解压长度 134,217,728 bytes，raw SHA256 为已知 `0b4b656a…`，两者均正确；此前默认路径选择导致的核对阻塞已解决，未取得之前误选副本的内容。
+
+新 LOADER 导出精确 128MiB，ext2 magic、UUID 和几何匹配原快照；读回 SHA256 为 `c19d3031144055158deb63c7d41fe5731ab2bd57e5250584434e7982aeacb08b`，与旧 raw 不同。报告 `raw_hash_matches_original_backup=false` 是两快照不相等的记录，不是本次身份/几何检查失败，也不能反过来证明仅元数据变化。结果保存在 `bsp/boot-readback-result.json`，没有公开 Windows 用户目录或文件系统 UUID。
+
+下一步的独立文件安装、启动切换和具体回退布局见 [安装与回退](05e-bsp-stage-and-rollback.md)。当前只读通道和备份已核对，实际恢复和新内核启动仍未完成。
+
 PDF 展示的是完整 update 固件升级，没有提供我们 128MiB boot 分区镜像的定点写回流程。不能把 original-boot.img 当完整固件、从扇区 0 写入。GPT 已验证 boot 几何，后续仍需完成完整读回核对并明确“下载镜像”页面的地址写入操作；高级功能导出框和下载页面的地址框不能仅凭相似外观就假定进制相同。本文目前不提供写入命令。

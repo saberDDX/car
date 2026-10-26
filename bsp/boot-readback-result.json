@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-26",
+  "scope": "User-reported Windows file verification and LOADER boot readback; no restore or new kernel boot performed.",
+  "original_backup_file_bytes": 25850532,
+  "original_backup_file_sha256": "6fa3cc6ca8ce04684c74d66897a9345e9e5333e101553eea84ec157fa1d9679a",
+  "original_backup_raw_bytes": 134217728,
+  "original_backup_raw_sha256": "0b4b656ab67b9365fe7b5e3de90940f45f8e95c293ad26823815a09a4c133444",
+  "original_gzip_hash_matches_record": true,
+  "export_bytes": 134217728,
+  "start_sector": 32768,
+  "sector_count": 262144,
+  "sector_bytes": 512,
+  "ext2_magic_ok": true,
+  "filesystem_uuid_matches_backup": true,
+  "filesystem_geometry_matches_backup": true,
+  "filesystem_bytes": 134217728,
+  "readback_sha256": "c19d3031144055158deb63c7d41fe5731ab2bd57e5250584434e7982aeacb08b",
+  "raw_hash_matches_original_backup": false,
+  "limitation": "Filesystem identity/geometry matched; whole contents of the two snapshots were not shown equal."
+}

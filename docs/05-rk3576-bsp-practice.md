@@ -8,7 +8,7 @@
 
 ## 已确认的条件
 
-**最新进度：**[完整运行配置与启动分析、ARM64 构建结果](05b-bsp-boot-and-build.md)已完成。新 Image、256 个内核模块、基础 DTB 及新内核的 GPIO 按键模块已生成，两个 overlay 的离线合并通过；新内核尚未上板启动。2026-10-26 用户确认 Windows 备份副本校验一致、RKDevTool v3.37 识别 MASKROM、退出后旧系统恢复正常连接，见 [USB 实测记录](05c-windows-usb-recovery-check.md)。定点恢复方法和部署布局仍待确认。
+**最新进度：**ARM64 Image、256 个内核模块、基础 DTB、新内核 GPIO 模块及配套 initrd 已生成，两个 overlay 离线合并通过。Windows 原备份双重哈希、MASKROM/LOADER、GPT 和完整 boot 读回身份/几何检查已实测通过。独立安装、切换、回退脚本及预案已准备，见 [安装与回退](05e-bsp-stage-and-rollback.md)。真实安装、启动和分区恢复仍未执行。
 
 完整运行配置与启动脚本已导出并完成分析，具体历史调查见 [板卡调查结果](05a-bsp-board-findings.md)。最新部署检查确认 `/boot` 可用 65,904,640 bytes，原 initrd 为带 legacy U-Boot 头的 8,436,090-byte 镜像；详细预算和后续输入见 [部署布局调查](05d-bsp-deployment-layout.md)。
 
@@ -30,7 +30,7 @@
 | 1. 构建 | 固定版本、准备工具链及可重复构建命令，整理产物 | 看懂配置来源、架构与交叉编译参数 | ARM64 Image、256 个模块、DTB 已构建和离线验证 |
 | 2. 集成 | 准备可审阅补丁，处理目录和头文件路径 | 对照 `CONFIG_CAR_MPU6050=m` 与 Kconfig/Makefile | 已通过完整源码树构建；新内核运行待验证 |
 | 3. 设备树 | 核对基础树与现有 overlay，避免重复节点 | 对照一次 reg/compatible/pinctrl | 新 DTB 与原 DTB 哈希相同，两个 overlay 离线合并通过 |
-| 4. 启动 | 恢复条件具备后准备独立启动文件和明确回退步骤 | 观察启动日志并核对运行版本 | 需确认定点恢复方法、initrd 和空间布局；尚未切换内核 |
+| 4. 启动 | 准备独立文件安装、uEnv 两行切换、Linux 回退和 Windows 预案 | 传入产物并执行 stage，再观察启动与回归 | 脚本 7 项模拟检查通过，等待实际 stage；尚未切换内核 |
 | 5. 排障 | 准备可恢复的模块匹配实验和日志检查 | 判断“有 client 无绑定”与 probe 失败的区别 | 待集成验证后执行 |
 | 6. 归档 | 更新验收记录、知识点与项目清单 | 口述构建—启动—绑定流程 | 进行中，不能提前写为完成 |
 
@@ -42,7 +42,7 @@ cd ~/car-driver-dev && git -c http.version=HTTP/1.1 pull --ff-only && python3 sc
 
 脚本读取当前 boot 空间、Image/initrd 大小与链接、initrd 内模块版本、initramfs 工具和相关配置，并在有限目录中寻找已有 loader 文件名。只在项目 `build/bsp/deployment-inputs.txt` 保存报告，不写 `/boot`、不加载驱动、不安装软件、不重启。
 
-用户已返回报告及原始 initrd。匹配新内核的独立 initrd 和含 initrd 的新离线包已完成，见 [initrd 分析与实际产物](05d-bsp-deployment-layout.md)。尚未修改板卡启动文件，下一步为核对 Windows 工具高级功能和 Recovery/LOADER 回退通道。
+用户已返回报告及原始 initrd。匹配新内核的独立 initrd 和含 initrd 的新离线包已完成，见 [initrd 分析与实际产物](05d-bsp-deployment-layout.md)。Windows 工具与 Recovery/LOADER 只读通道已核对，下一步恢复正常 Linux 后传入包并执行 stage；该动作保持当前 uEnv 不变。
 
 报告中的 unavailable/找不到软件包可以是正常调查结果，保留原输出。不会输出整个环境变量、完整内核命令行或硬件序列号。文件存在不证明启动加载器真的使用它，需要后续与启动日志或厂家脚本对照。
 
@@ -73,7 +73,7 @@ python3 scripts/make-bsp-integration-patch.py <kernel-checkout>
 
 ## 启动与时间限制
 
-当前已确认 MASKROM 识别并保存了电脑上的 boot 备份，仍需明确 loader、目标存储和定点恢复操作；识别成功不等于已验证恢复。下一步结合 initrd 与实际空间完成部署设计，保留原 Image 和原 modules。不能直接覆盖唯一可用启动镜像。
+当前已确认 MASKROM/LOADER 和 eMMC 定点读回，电脑保存最初 gzip 备份及最新 raw boot 快照。Linux 配置回退和 Windows boot 定点写回预案已明确；实际恢复尚未执行。部署保留原 Image/initrd/modules，通过独立动作才切换 uEnv。
 
 实板曾有时钟回退，NTP 服务不可用；应核对真实时间，不能重复执行之前对话里的固定旧日期命令。内核构建需正确时间，避免 Clock skew 和错误增量结果。
 
