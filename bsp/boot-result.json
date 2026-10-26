@@ -1,0 +1,8 @@
+{
+  "date": "2026-10-26",
+  "source": "User-provided board uname and deployment status after activation/reboot",
+  "running_kernel": "6.1.99-rk3576-car-bsp",
+  "phase": "active",
+  "uenv": "experiment",
+  "scope": "Real experimental-kernel boot confirmed; live configuration and peripheral regression pending."
+}

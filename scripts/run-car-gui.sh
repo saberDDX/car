@@ -90,8 +90,22 @@ if [ "$missing" -ne 0 ]; then
 fi
 
 printf '[2/4] Build the current source in build/qt (old binaries are not reused)\n'
-sh "$repo_dir/scripts/check-board-env.sh"
-make -C "$repo_dir/drivers/gpio-key" -j2
+kernel=$(uname -r)
+if [ "$kernel" = 6.1.99-rk3576-car-bsp ]; then
+    module_file=$(modinfo -k "$kernel" -F filename car_gpio_key)
+    case "$module_file" in
+        /lib/modules/"$kernel"/*|/usr/lib/modules/"$kernel"/*) ;;
+        *) printf 'STOP: unexpected installed key module path.\n' >&2; exit 1 ;;
+    esac
+    printf 'Using the installed experimental key module: %s\n' "$module_file"
+else
+    sh "$repo_dir/scripts/check-board-env.sh"
+    make -C "$repo_dir/drivers/gpio-key" -j2
+fi
+case "$(modinfo -F vermagic "$module_file")" in
+    "$kernel "*) ;;
+    *) printf 'STOP: key module does not match running kernel.\n' >&2; exit 1 ;;
+esac
 qmake -v
 if ! (cd "$build_dir" && qmake "$repo_dir/car/car.pro" && make -j2) > "$build_dir/build.log" 2>&1; then
     printf 'Qt build failed; diagnostics from %s:\n' "$build_dir/build.log" >&2

@@ -8,7 +8,7 @@
 
 ## 已确认的条件
 
-**最新进度：**ARM64 Image、256 个内核模块、基础 DTB、新内核 GPIO 模块及配套 initrd 已生成，两个 overlay 离线合并通过。Windows 原备份双重哈希、MASKROM/LOADER、GPT 和完整 boot 读回身份/几何检查已实测通过。用户已完成真实 stage：两个独立启动文件和共 257 个模块安装、核对通过，uEnv 保持原样。下一步单独 activate 并重启，见 [安装与回退](05e-bsp-stage-and-rollback.md)。新内核启动和分区恢复尚未执行。
+**最新进度：**ARM64 Image、256 个内核模块、基础 DTB、新内核 GPIO 模块及配套 initrd 已生成，两个 overlay 离线合并通过。Windows 原备份双重哈希、MASKROM/LOADER、GPT 和完整 boot 读回身份/几何检查已通过。用户已完成真实 stage、activate/reboot，运行版本与 uEnv 均确认为 `6.1.99-rk3576-car-bsp`，新内核真实启动通过。下一步为 [运行配置和外设回归](05f-bsp-runtime-regression.md)；匹配排障与实际分区恢复尚未执行。
 
 完整运行配置与启动脚本已导出并完成分析，具体历史调查见 [板卡调查结果](05a-bsp-board-findings.md)。最新部署检查确认 `/boot` 可用 65,904,640 bytes，原 initrd 为带 legacy U-Boot 头的 8,436,090-byte 镜像；详细预算和后续输入见 [部署布局调查](05d-bsp-deployment-layout.md)。
 
@@ -30,7 +30,7 @@
 | 1. 构建 | 固定版本、准备工具链及可重复构建命令，整理产物 | 看懂配置来源、架构与交叉编译参数 | ARM64 Image、256 个模块、DTB 已构建和离线验证 |
 | 2. 集成 | 准备可审阅补丁，处理目录和头文件路径 | 对照 `CONFIG_CAR_MPU6050=m` 与 Kconfig/Makefile | 已通过完整源码树构建；新内核运行待验证 |
 | 3. 设备树 | 核对基础树与现有 overlay，避免重复节点 | 对照一次 reg/compatible/pinctrl | 新 DTB 与原 DTB 哈希相同，两个 overlay 离线合并通过 |
-| 4. 启动 | 准备独立文件安装、uEnv 两行切换、Linux 回退和 Windows 预案 | 执行 activate/reboot，返回运行版本 | 7 项模拟检查及真实 stage 已通过；等待切换和真实启动 |
+| 4. 启动 | 准备独立文件安装、uEnv 两行切换、Linux 回退和 Windows 预案 | 返回运行版本，执行外设回归 | 真实 stage/activate/reboot 通过，实验内核已运行；外设回归待执行 |
 | 5. 排障 | 准备可恢复的模块匹配实验和日志检查 | 判断“有 client 无绑定”与 probe 失败的区别 | 待集成验证后执行 |
 | 6. 归档 | 更新验收记录、知识点与项目清单 | 口述构建—启动—绑定流程 | 进行中，不能提前写为完成 |
 
