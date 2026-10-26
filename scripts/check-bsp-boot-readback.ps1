@@ -1,7 +1,8 @@
 # Read Windows image files only. Does not access devices or invoke RKDevTool.
 param(
     [string]$ExportImagePath,
-    [string]$BackupGzipPath
+    [Alias('BackupGzipPath')]
+    [string]$BackupImagePath
 )
 $ErrorActionPreference = 'Stop'
 
@@ -42,30 +43,83 @@ function Read-ImagePrefix([string]$Path, [bool]$Gzip) {
     }
 }
 
+function Read-AuditedBackup([string]$Path, [bool]$Gzip) {
+    # Validate the uncompressed bytes, so re-compressing an unchanged backup
+    # cannot cause a false failure. Keep the recorded raw SHA256 mandatory.
+    $expectedBytes = 134217728
+    $expectedRawHash = '0b4b656ab67b9365fe7b5e3de90940f45f8e95c293ad26823815a09a4c133444'
+    $file = [System.IO.File]::OpenRead($Path)
+    $stream = $file
+    $hash = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        if ($Gzip) {
+            $stream = [System.IO.Compression.GZipStream]::new(
+                $file, [System.IO.Compression.CompressionMode]::Decompress)
+        }
+        $buffer = New-Object byte[] 1048576
+        $prefix = New-Object byte[] 4096
+        $prefixBytes = 0
+        [long]$total = 0
+        while ($true) {
+            $limit = [int][Math]::Min($buffer.Length, $expectedBytes + 1 - $total)
+            $count = $stream.Read($buffer, 0, $limit)
+            if ($count -eq 0) { break }
+            $total += $count
+            if ($total -gt $expectedBytes) {
+                throw 'Original backup expands beyond 128 MiB. Select the original boot partition backup.'
+            }
+            if ($prefixBytes -lt $prefix.Length) {
+                $copy = [Math]::Min($count, $prefix.Length - $prefixBytes)
+                [Array]::Copy($buffer, 0, $prefix, $prefixBytes, $copy)
+                $prefixBytes += $copy
+            }
+            [void]$hash.TransformBlock($buffer, 0, $count, $buffer, 0)
+        }
+        [void]$hash.TransformFinalBlock([byte[]]@(), 0, 0)
+        $rawHash = [BitConverter]::ToString($hash.Hash).Replace('-', '').ToLowerInvariant()
+        Write-Host "Original backup raw bytes: $total"
+        Write-Host "Original backup raw SHA256: $rawHash"
+        if ($total -ne $expectedBytes -or $rawHash -ne $expectedRawHash) {
+            throw "Original raw backup does not match the recorded snapshot. Expected SHA256=$expectedRawHash. Re-select the ORIGINAL backup; do not select the new RKDevTool export."
+        }
+        return [pscustomobject]@{ Prefix = $prefix; RawSha256 = $rawHash; RawBytes = $total }
+    } finally {
+        $hash.Dispose()
+        $stream.Dispose()
+        if ($Gzip) { $file.Dispose() }
+    }
+}
+
 if (-not $ExportImagePath) {
     $ExportImagePath = Select-ImageFile 'Select the NEW 128 MiB RKDevTool boot export' 'Raw images (*.img)|*.img|All files (*.*)|*.*'
 }
 $ExportImagePath = (Resolve-Path -LiteralPath $ExportImagePath).ProviderPath
+Write-Host "Selected NEW export: $ExportImagePath"
 $size = (Get-Item -LiteralPath $ExportImagePath).Length
 if ($size -ne 134217728) {
     throw "Wrong export size: $size bytes; expected 134217728. Select the new full boot export, not the 20 KiB GPT file."
 }
 
-if (-not $BackupGzipPath) {
-    $candidate = Join-Path $env:USERPROFILE 'Downloads\original-boot.img.gz'
-    if (Test-Path -LiteralPath $candidate) {
-        $BackupGzipPath = $candidate
-    } else {
-        $BackupGzipPath = Select-ImageFile 'Select your ORIGINAL verified original-boot.img.gz backup' 'Gzip backups (*.gz)|*.gz|All files (*.*)|*.*'
-    }
+if (-not $BackupImagePath) {
+    $BackupImagePath = Select-ImageFile 'Select the ORIGINAL original-boot.img.gz OR original-boot.img (NOT the new export)' 'Boot backups (*.gz;*.img)|*.gz;*.img|All files (*.*)|*.*'
 }
-$BackupGzipPath = (Resolve-Path -LiteralPath $BackupGzipPath).ProviderPath
+$BackupImagePath = (Resolve-Path -LiteralPath $BackupImagePath).ProviderPath
+if ($BackupImagePath -eq $ExportImagePath) {
+    throw 'Select two different files: the NEW export and the ORIGINAL backup.'
+}
+Write-Host "Selected ORIGINAL backup: $BackupImagePath"
+Write-Host "Original backup file bytes: $((Get-Item -LiteralPath $BackupImagePath).Length)"
 $expectedBackupHash = '6fa3cc6ca8ce04684c74d66897a9345e9e5333e101553eea84ec157fa1d9679a'
-$backupHash = (Get-FileHash -LiteralPath $BackupGzipPath -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($backupHash -ne $expectedBackupHash) {
-    throw 'Original compressed backup SHA256 mismatch. No report approved.'
+$backupHash = (Get-FileHash -LiteralPath $BackupImagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+Write-Host "Original backup file SHA256: $backupHash"
+$probe = [System.IO.File]::OpenRead($BackupImagePath)
+try {
+    $backupIsGzip = ($probe.ReadByte() -eq 0x1f -and $probe.ReadByte() -eq 0x8b)
+} finally {
+    $probe.Dispose()
 }
-$original = Read-ImagePrefix $BackupGzipPath $true
+$backup = Read-AuditedBackup $BackupImagePath $backupIsGzip
+$original = $backup.Prefix
 $readback = Read-ImagePrefix $ExportImagePath $false
 if ([BitConverter]::ToUInt16($original, 1080) -ne 0xef53 -or
     [BitConverter]::ToUInt16($readback, 1080) -ne 0xef53) {
@@ -92,7 +146,10 @@ $report = [ordered]@{
     expected_start_sector = 32768
     expected_sector_count = 262144
     sector_bytes = 512
-    original_gzip_sha256 = $backupHash
+    original_backup_encoding = $(if ($backupIsGzip) { 'gzip' } else { 'raw' })
+    original_backup_file_sha256 = $backupHash
+    original_backup_raw_sha256 = $backup.RawSha256
+    original_gzip_hash_matches_record = ($backupIsGzip -and $backupHash -eq $expectedBackupHash)
     ext2_magic_ok = $true
     filesystem_uuid_matches_backup = $uuidMatches
     filesystem_geometry_matches_backup = $true
