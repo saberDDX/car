@@ -35,9 +35,7 @@
     "quiet_observation_seconds": 1,
     "result": "PASS"
   },
-  "pending": [
-    "Controlled platform matching-failure exercise"
-  ],
+  "pending": [],
   "limitations": [
     "This is a 10-second functional regression, not the earlier 5-minute stability test.",
     "No calibration/measurement-accuracy or hard-real-time claim.",
@@ -48,5 +46,12 @@
     "live_video": true,
     "reopen": true,
     "long_hold_single_window": true
+  },
+  "matching_exercise": {
+    "evidence": "Staged: original run reached post-restoration physical check, then independent physical recheck passed",
+    "initial_attempt": "key-match-attempt.json",
+    "physical_recheck": "key-verify-result.json",
+    "single_combined_default_command_pass_report": false,
+    "initial_extra_press_cause": "undetermined"
   }
 }

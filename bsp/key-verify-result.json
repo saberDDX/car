@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-26",
+  "source": "User-provided --verify-only terminal output",
+  "release": "6.1.99-rk3576-car-bsp",
+  "mode": "verify-only",
+  "matching_fault_injected": false,
+  "current_binding": "PASS",
+  "driver_override_empty": true,
+  "physical_check": {
+    "pressed": 1,
+    "released": 1,
+    "repeated": 0,
+    "press_monotonic_seconds": "4018.580218",
+    "release_monotonic_seconds": "4021.636118",
+    "hold_seconds": 3.0559,
+    "quiet_observation_seconds": 1,
+    "result": "PASS"
+  },
+  "report": "build/bsp/key-verify-20261026T132659Z-4617.json",
+  "events_log": "build/bsp/key-verify-20261026T132659Z-4617.events.log",
+  "scope": "Current binding/empty override and physical recheck passed. No matching fault injected this run; earlier combined attempt remains separately recorded as a physical-check failure."
+}

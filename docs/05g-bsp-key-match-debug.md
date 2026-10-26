@@ -22,6 +22,8 @@ sudo python3 scripts/test-bsp-key-match.py
 
 首次实板尝试已到达恢复后的物理按键验收，但计数为 pressed=2/released=1/repeated=0，目标为 1 对，故工具严格判定 FAIL。进入该提示说明前面的匹配阻断/恢复检查已完成，但用户未贴出原 BEFORE/FAULT/RESTORED 三行；不能将整个练习标为 PASS。失败摘要见 `bsp/key-match-attempt.json`。
 
+随后独立 `--verify-only` 复查通过：时间戳 4018.580218→4021.636118，间隔 3.055900 秒，1 次按下/松开、零重复，静默和当前绑定/空 override 检查均 PASS。见 `bsp/key-verify-result.json`。本案例按这两阶段的实际结果归档，不宣称取得一次完整工具全 PASS 报告，也未确定第一次额外事件的原因；完整范围见 [最终归档](05h-bsp-acceptance-and-study.md)。
+
 ## 只复核当前按键，不重复注入故障
 
 旧版在最后的物理检查失败时没有保存此前的状态记录。已改为先保存匹配/恢复阶段，再独立记录按键 PASS/FAIL/中断状态；同时保存带时间戳的原始事件日志。额外按下、短按、自动重复和不配对事件仍然失败，没有放宽标准。
