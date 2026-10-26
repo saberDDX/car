@@ -45,6 +45,12 @@ int main(void)
 	assert(send(&state, KEY_CAMERA, 0, 2000)); /* Bad timestamps. */
 	state = (struct key_verification){ .target = 1 };
 	assert(send(&state, KEY_CAMERA, 3, 2000)); /* Invalid event value. */
+	state = (struct key_verification){ .target = 1 };
+	assert(!send(&state, KEY_CAMERA, 1, 1000));
+	assert(!send(&state, KEY_CAMERA, 0, 4000));
+	assert(key_verify_balanced(&state));
+	assert(!key_verify_result(&state)); /* One valid long hold passes. */
+	assert(send(&state, KEY_CAMERA, 1, 4100)); /* Reported 1,0,1 sequence must still fail. */
 	puts("PASS: key verifier accepts 20 balanced pairs with a long hold and rejects invalid sequences.");
 	return 0;
 }

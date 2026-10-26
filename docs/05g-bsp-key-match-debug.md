@@ -20,7 +20,24 @@ sudo python3 scripts/test-bsp-key-match.py
 
 工具打印 BEFORE、FAULT、RESTORED 三份状态。出现 Verify 后，按 K1 一次、保持约 3 秒再松开；收到最终 PASS 才算匹配故障与物理恢复均验证。报告保存到 `build/bsp/key-match-....json`。
 
-目前脚本和模拟测试已完成，尚无本次练习的实板执行结果。不能将下文预期流程写成已经实测的故障经历。
+首次实板尝试已到达恢复后的物理按键验收，但计数为 pressed=2/released=1/repeated=0，目标为 1 对，故工具严格判定 FAIL。进入该提示说明前面的匹配阻断/恢复检查已完成，但用户未贴出原 BEFORE/FAULT/RESTORED 三行；不能将整个练习标为 PASS。失败摘要见 `bsp/key-match-attempt.json`。
+
+## 只复核当前按键，不重复注入故障
+
+旧版在最后的物理检查失败时没有保存此前的状态记录。已改为先保存匹配/恢复阶段，再独立记录按键 PASS/FAIL/中断状态；同时保存带时间戳的原始事件日志。额外按下、短按、自动重复和不配对事件仍然失败，没有放宽标准。
+
+若仅需复核当前状态和一次物理长按，运行：
+
+```sh
+cd ~/car-driver-dev &&
+git -c http.version=HTTP/1.1 pull --ff-only origin dev/driver-baseline &&
+make -B -C tools/key-monitor &&
+sudo python3 scripts/test-bsp-key-match.py --verify-only
+```
+
+此模式不设置错误 override、不临时 unbind；先检查正确绑定和空 override，必要时正常加载已安装模块。出现 Verify 后仅按一次，直接保持约 3 秒，松开后把手移开，等目标后的 1 秒静默观察完成。达到次数时会立即打印 keep released 提示。若仍多出事件，按时间戳继续判断额外操作/触点抖动，不直接增加目标次数来掩盖异常。
+
+只复核的 JSON 使用 `matching_fault_injected=false`，不会声称该次重新复现过匹配故障；若此前模块曾被清理并重新加载，也不冒称验证了此前同一个设备实例的物理行为。完整实验仍可用不带参数的命令运行。
 
 ## 具体流程与代码
 
@@ -97,4 +114,4 @@ sudo sh -c 'printf "car-camera-key\n" > /sys/bus/platform/drivers_probe'
 
 ## 云端验证范围
 
-8 项状态机检查通过：正常故障/恢复、已有 override 不动、设置后失败恢复、解绑失败恢复、重扫失败恢复、Ctrl+C 路径、并发其他 owner 不覆盖、云端主入口拒绝。测试使用模拟设备，不写真实 sysfs，不作为实板完成证据。
+12 项检查通过：原有 8 项状态机/环境检查，加上只复核不注入故障、物理失败仍保留匹配证据、中断保存报告、失败子进程事件日志保留。C 事件检查器的原测试及本次 `1→0→1` 拒绝样例通过，包含目标 1 对的有效长按和额外按下拒绝。没有更改驱动或消抖时间。测试不作为实板物理复查完成证据。

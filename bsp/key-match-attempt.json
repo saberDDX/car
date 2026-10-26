@@ -1,0 +1,22 @@
+{
+  "date": "2026-10-26",
+  "source": "User-provided terminal failure tail from the first real matching exercise",
+  "release": "6.1.99-rk3576-car-bsp",
+  "reached_stage": "post-restore physical key check",
+  "matching_and_restore_checks": "Completed according to control flow reaching the physical prompt; raw BEFORE/FAULT/RESTORED snapshots not pasted",
+  "physical_check": {
+    "requested_pairs": 1,
+    "pressed": 2,
+    "released": 1,
+    "repeated": 0,
+    "result": "FAIL",
+    "observed_values": [
+      1,
+      0,
+      1
+    ],
+    "timestamps_available": false
+  },
+  "cause": "Undetermined: additional manual operation or unintended extra transitions",
+  "scope": "Do not label the full exercise PASS; independent timestamped physical recheck pending."
+}

@@ -1,8 +1,14 @@
 """Controlled matching-fault state machine and restoration; no sysfs writes."""
 import importlib.util
+import contextlib
+import io
+import json
 from pathlib import Path
 import subprocess
+import sys
+import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("bsp_match", ROOT / "scripts/test-bsp-key-match.py")
@@ -127,6 +133,46 @@ class MatchTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=10)
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("STOP:", result.stderr)
+
+    def test_verify_only_does_not_inject_or_claim_a_matching_fault(self):
+        device = FakeKey()
+        record = MODULE.prepare_record(device, "unused", verify_only=True, emit=lambda line: None)
+        self.assertFalse(record["matching_fault_injected"])
+        self.assertNotIn("fault", record)
+        self.assertNotIn("matching_state_transitions", record)
+        self.assertEqual(device.unbinds, 0)
+        self.assertEqual(device.probes, 0)
+        self.assertEqual(device.value, "")
+
+    def test_failed_physical_check_keeps_matching_evidence(self):
+        record = {"restored": FakeKey().snapshot(), "matching_state_transitions": "PASS"}
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
+            report = Path(temp) / "report.json"
+            with patch.object(MODULE, "monitor_to_log", return_value=1):
+                with self.assertRaisesRegex(RuntimeError, "Physical key check failed"):
+                    MODULE.verify_record(record, Path("/not-executed"), report, Path(temp) / "events.log")
+            saved = json.loads(report.read_text())
+            self.assertEqual(saved["matching_state_transitions"], "PASS")
+            self.assertEqual(saved["physical_key_after_restore"], "FAIL")
+            self.assertEqual(saved["monitor_exit_status"], 1)
+
+    def test_interrupted_check_keeps_report(self):
+        record = {"restored": FakeKey().snapshot()}
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
+            report = Path(temp) / "report.json"
+            with patch.object(MODULE, "monitor_to_log", side_effect=KeyboardInterrupt):
+                with self.assertRaises(KeyboardInterrupt):
+                    MODULE.verify_record(record, Path("/not-executed"), report, Path(temp) / "events.log")
+            self.assertEqual(json.loads(report.read_text())["physical_key_after_restore"], "INTERRUPTED")
+
+    def test_event_log_preserves_failed_child_output(self):
+        with tempfile.TemporaryDirectory() as temp, contextlib.redirect_stdout(io.StringIO()):
+            event_log = Path(temp) / "events.log"
+            result = MODULE.monitor_to_log([sys.executable, "-u", "-c",
+                "print('code=212 value=1 time=3.000000'); print('FAIL: extra press'); raise SystemExit(1)"], event_log)
+            self.assertEqual(result, 1)
+            self.assertIn("time=3.000000", event_log.read_text())
+            self.assertIn("FAIL: extra press", event_log.read_text())
 
 
 if __name__ == "__main__":

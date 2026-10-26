@@ -207,10 +207,12 @@ int main(int argc, char **argv)
 				++releases;
 			else if (event->value == 2)
 				++repeats;
-			printf("code=%u value=%d (%s)\n", event->code, event->value,
+			printf("code=%u value=%d (%s) time=%lld.%06lld\n", event->code, event->value,
 			       event->value == 1 ? "pressed" :
 			       event->value == 0 ? "released" :
-			       event->value == 2 ? "repeat" : "unknown");
+			       event->value == 2 ? "repeat" : "unknown",
+			       (long long)event->time.tv_sec,
+			       (long long)event->time.tv_usec);
 			if (verify) {
 				const char *error = key_verify_event(&verification, event);
 
@@ -230,6 +232,7 @@ int main(int argc, char **argv)
 						break;
 					}
 					quiet_until = (long long)now.tv_sec * 1000 + now.tv_nsec / 1000000 + 1000;
+					printf("Target pair count reached. Keep K1 released; do not press again. Observing 1 second of quiet...\n");
 				}
 			}
 		}

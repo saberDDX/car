@@ -58,12 +58,16 @@ class KeyDevice:
         raise RuntimeError("Key binding/input device did not recover within 2 seconds")
 
 
+def require_ready(state):
+    if (not state["device_present"] or state["compatible"] != COMPATIBLE
+            or not state["module_loaded"] or state["driver"] != str(DRIVER)
+            or len(state["events"]) != 1 or state["driver_override"]):
+        raise ValueError("Need the expected loaded/bound key with one input device and an empty driver_override")
+
+
 def exercise(device, marker, emit=print):
     before = device.snapshot()
-    if (not before["device_present"] or before["compatible"] != COMPATIBLE
-            or not before["module_loaded"] or before["driver"] != str(DRIVER)
-            or len(before["events"]) != 1 or before["driver_override"]):
-        raise ValueError("Need the expected loaded/bound key with one input device and an empty driver_override")
+    require_ready(before)
     emit("BEFORE: " + json.dumps(before))
     changed = False
     try:
@@ -99,9 +103,70 @@ def interrupted(signum, _frame):
     raise SystemExit(128 + signum)
 
 
+def prepare_record(device, marker, verify_only=False, emit=print):
+    if verify_only:
+        restored = device.snapshot()
+        require_ready(restored)
+        emit("CURRENT: " + json.dumps(restored))
+        return {"restored": restored, "matching_fault_injected": False,
+                "scope": "Current binding and physical input recheck only; no matching fault injected this run."}
+    record = exercise(device, marker, emit=emit)
+    record.update({"matching_fault_injected": True, "matching_state_transitions": "PASS",
+                   "fault_kind": "platform driver_override blocks matching",
+                   "scope": "Deliberate match failure and automatic rebind completed; physical verification recorded separately."})
+    return record
+
+
+def monitor_to_log(command, destination):
+    """Display prompts live, preserving event timestamps even on a failed check."""
+    with destination.open("w") as log:
+        with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                              text=True, bufsize=1) as process:
+            try:
+                for line in process.stdout:
+                    print(line, end="", flush=True)
+                    log.write(line)
+                    log.flush()
+                return process.wait()
+            except BaseException:
+                if process.poll() is None:
+                    process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=2)
+                raise
+
+
+def verify_record(record, monitor, report, event_log):
+    record["physical_key_after_restore"] = "PENDING"
+    record["event_log"] = str(event_log)
+    report.write_text(json.dumps(record, indent=2) + "\n")
+    try:
+        result = monitor_to_log(["timeout", "--foreground", "60", str(monitor), "--verify", "1",
+                                 record["restored"]["events"][0]], event_log)
+        record["physical_key_after_restore"] = "PASS" if result == 0 else "FAIL"
+        record["monitor_exit_status"] = result
+    except (KeyboardInterrupt, SystemExit):
+        record["physical_key_after_restore"] = "INTERRUPTED"
+        raise
+    except Exception:
+        record["physical_key_after_restore"] = "ERROR"
+        raise
+    finally:
+        report.write_text(json.dumps(record, indent=2) + "\n")
+        print("Report: " + str(report), flush=True)
+        print("Event log: " + str(event_log), flush=True)
+    if result:
+        raise RuntimeError("Physical key check failed; state report and timestamped events were saved. The count/long-hold/quiet rules were not relaxed.")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args()
+    parser.add_argument("--verify-only", action="store_true",
+                        help="Recheck the current binding and physical key without injecting a matching fault")
+    args = parser.parse_args()
     if os.geteuid() != 0 or platform.machine() != "aarch64" or platform.release() != RELEASE:
         raise ValueError("Run with sudo only on the verified experimental LubanCat-3 kernel")
     if Path("/sys/firmware/devicetree/base/model").read_bytes().rstrip(b"\0\n") != b"EmbedFire LubanCat-3":
@@ -123,20 +188,20 @@ def main():
                 raise ValueError("Installed key module does not match the experiment")
             device = KeyDevice()
             device.wait_ready()
-            record = exercise(device, marker, emit=lambda line: print(line, flush=True))
-            print("Press/release K1 ONCE after Verify, holding it for 3 seconds.", flush=True)
-            subprocess.run(["timeout", "--foreground", "60", str(monitor), "--verify", "1",
-                            record["restored"]["events"][0]], check=True)
-            record.update({"release": RELEASE, "fault_kind": "platform driver_override blocks matching",
-                           "physical_key_after_restore": "PASS", "boot_or_device_tree_changed": False,
-                           "scope": "Deliberate match failure, automatic rebind and physical input verification; not a partition restore test."})
+            record = prepare_record(device, marker, args.verify_only,
+                                    emit=lambda line: print(line, flush=True))
+            record.update({"release": RELEASE, "boot_or_device_tree_changed": False})
             folder = ROOT / "build/bsp"
             folder.mkdir(parents=True, exist_ok=True)
             stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-            report = folder / ("key-match-" + stamp + "-" + str(os.getpid()) + ".json")
-            report.write_text(json.dumps(record, indent=2) + "\n")
-            print("PASS: controlled matching failure, cleared override, recovered binding/input and physical key event.")
-            print("Report: " + str(report))
+            prefix = "key-verify-" if args.verify_only else "key-match-"
+            report = folder / (prefix + stamp + "-" + str(os.getpid()) + ".json")
+            print("Release K1 now. After Verify, press ONCE, HOLD for 3 seconds, then RELEASE and keep hands off until PASS.", flush=True)
+            verify_record(record, monitor, report, report.with_suffix(".events.log"))
+            if args.verify_only:
+                print("PASS: current binding, empty override and physical key recheck; no matching fault injected.")
+            else:
+                print("PASS: controlled matching failure, cleared override, recovered binding/input and physical key event.")
         finally:
             parameter = Path("/sys/module/car_gpio_key/parameters/run_id")
             if parameter.exists() and parameter.read_text().strip() == token:
