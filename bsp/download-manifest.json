@@ -1,0 +1,29 @@
+{
+  "file_name": "car-bsp-artifacts-with-initrd.tar.gz",
+  "bytes": 29094301,
+  "sha256": "a7e612fe27e8151abd5d85c37accc67f24045d02891b9ab09658a503ddeee6e5",
+  "parts": [
+    {
+      "name": "car-bsp-a7e612fe.part01",
+      "bytes": 8388608,
+      "sha256": "af5393842a50a4dc781244f646f558436381a69eb7c9e13f7f91e424be225a44"
+    },
+    {
+      "name": "car-bsp-a7e612fe.part02",
+      "bytes": 8388608,
+      "sha256": "62d719fdb2144baec0dcc5d5d069ce122466429807a067b9d7b2ea5b6d1a4b21"
+    },
+    {
+      "name": "car-bsp-a7e612fe.part03",
+      "bytes": 8388608,
+      "sha256": "f7a1eada4a2579fb16dbe3d7bd9b61583f5d48ac20e46e4759a7f2210b9d8d30"
+    },
+    {
+      "name": "car-bsp-a7e612fe.part04",
+      "bytes": 3928477,
+      "sha256": "ef7ba2235e91ce7c437965ee57cd279b3b5f4c2442c5b82ffeb0c69436290cf4"
+    }
+  ],
+  "artifact_commit": "72289d5ea911f42e5945f72098dea6d19b308719",
+  "artifact_tag": "artifacts-rk3576-bsp-a7e612fe"
+}

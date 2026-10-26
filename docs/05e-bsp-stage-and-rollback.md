@@ -44,6 +44,16 @@ initrd=initrd-6.1.99-rk3576-car-bsp
 
 退出 Windows 工具，断开 OTG 和独立供电，松开按键，按正常方式重新供电。恢复 VS Code/SSH 后，将云端提供的 `car-bsp-artifacts-with-initrd.tar.gz`（29,094,301 bytes）从 Windows 拖入 VS Code 远程资源管理器中的 `/home/cat/car-driver-dev/build/bsp/`。不自行覆盖解压到系统目录。
 
+### Windows 桌面下载入口
+
+聊天中的 `/workspace/...` 链接会在部分客户端进入不支持压缩包的云端预览，用户实测无法从那里下载。因此已发布独立产物标签 `artifacts-rk3576-bsp-a7e612fe`，指向无开发分支父提交的产物 commit `72289d5ea911f42e5945f72098dea6d19b308719`。标签只存储四段文件及清单；不将大文件加入开发分支，也不需要 GitHub Release API（本环境该接口返回 Forbidden）。最初用于发布的临时 artifacts 分支已转换为该标签，避免普通开发分支 fetch 默认拉取所有分支时附带下载整个产物。
+
+`scripts/download-bsp-artifacts.ps1` 自动查找 Windows 的 DesktopDirectory，支持桌面重定向；从固定产物 commit 下载四段，分别验证大小和 SHA256，按序合并，再验证完整包的已知哈希。GitHub raw 与 jsDelivr 各有重试，正确分段缓存在用户 TEMP，失败后可复用。它只写用户桌面和 TEMP，不安装内核或操作板卡。桌面同名文件若内容不同，会先保留为 `.previous-...`，再保存已验证的新包。
+
+用户在 Windows 原样粘贴助手提供的一行入口即可：固定提交下载脚本→核对脚本 SHA256→执行。无需手填用户名、下载目录或文件选择器标题。输出 `READY: <真实桌面路径>` 才表示本机已完成下载，助手不能从云端直接宣称已写入用户桌面。
+
+实际检查：已在云端 PowerShell 7.4.19 完整联网下载四段、复用校验通过的缓存并合并。输出文件为 29,094,301 bytes，SHA256 为 `a7e612fe27e8151abd5d85c37accc67f24045d02891b9ab09658a503ddeee6e5`，与原产物一致。初测时修正了 PowerShell 在 Linux 上读取 dot 临时文件需 Get-Item -Force 的兼容问题。实际 Windows 桌面路径和网络由用户运行结果确认。
+
 在板卡运行：
 
 ```sh
