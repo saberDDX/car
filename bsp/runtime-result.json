@@ -36,12 +36,17 @@
     "result": "PASS"
   },
   "pending": [
-    "Qt live video visual verification",
     "Controlled platform matching-failure exercise"
   ],
   "limitations": [
     "This is a 10-second functional regression, not the earlier 5-minute stability test.",
     "No calibration/measurement-accuracy or hard-real-time claim.",
     "Camera enumeration alone does not verify video streaming."
-  ]
+  ],
+  "gui_visual": {
+    "source": "User confirmation: live video, reopen and long hold normal",
+    "live_video": true,
+    "reopen": true,
+    "long_hold_single_window": true
+  }
 }
