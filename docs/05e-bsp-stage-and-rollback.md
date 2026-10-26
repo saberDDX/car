@@ -6,7 +6,7 @@
 
 新读回快照 SHA256：`c19d3031144055158deb63c7d41fe5731ab2bd57e5250584434e7982aeacb08b`。它与较早原始快照哈希不同；身份/几何匹配不证明每个文件内容相同。该文件是在安装新内核之前、原系统正常启动后的 Recovery/LOADER 会话里读出，后续作为该时点 boot 的原始回退快照保留。最初的 `original-boot.img.gz` 也继续保留。
 
-只读通道已实测，实际写回仍未测试。当前未安装、切换或启动新内核。
+只读通道已实测，实际写回仍未测试。用户已完成下述 stage，真实启动配置尚未切换，新内核尚未启动。
 
 ## 独立文件布局
 
@@ -66,6 +66,18 @@ stage 将审核固定包 SHA256、原 boot.cmd/boot.scr/initrd/DTB/uEnv、板型
 
 输出 STAGED 后，当前 uEnv 仍为原配置，正在运行的内核仍是原内核。这一步不是已经上板启动新内核。脚本会检查并记录旧文件哈希，以便后续切换前确认未被修改。
 
+### 实板 stage 已通过
+
+用户在更新到 `46bb10f` 后返回：
+
+```text
+STAGED: Image, initrd and 257 modules for 6.1.99-rk3576-car-bsp; active uEnv unchanged.
+Prepared uEnv changes: uname_r=6.1.99-rk3576-car-bsp; initrd=initrd-6.1.99-rk3576-car-bsp
+State/rollback data: /var/lib/car-bsp/6.1.99-rk3576-car-bsp/state.json
+```
+
+这表示已通过脚本的真实板型/旧内核/分区检查、包哈希和全部清单检查、原启动文件检查、空间检查、独立文件安装及读回核对。没有切换 uEnv，也没有加载新内核模块。证据记录见 `bsp/stage-result.json`。
+
 ## 第二阶段：单独切换与正常回退
 
 完成安装输出核对并保留 Windows 回退文件后，切换命令为：
@@ -77,6 +89,16 @@ sudo reboot
 ```
 
 重连后应看到 `uname -r` 为 `6.1.99-rk3576-car-bsp`，随后检查运行配置、MPU6050/按键绑定、采集与摄像头。不能直接在新内核上沿用原 headers 重编模块：本包没有新 headers，应先使用本包已安装的匹配模块。
+
+先返回以下最小启动证据，再执行外设回归：
+
+```sh
+cd ~/car-driver-dev &&
+uname -r &&
+sudo python3 scripts/deploy-bsp-kernel.py status
+```
+
+预期 running_kernel 为 `6.1.99-rk3576-car-bsp`、phase 为 active、uenv 为 experiment。仅 phase/uenv 符合而 running_kernel 仍是旧值，不算成功启动新内核。
 
 静态启动文件不能完全证明 U-Boot 优先选中了 boot.cmd。若重启后仍为原内核，先运行 status 并调查实际 boot target，不删除原 Image，也不盲目改更多启动入口。此次不为强制切换去重写 extlinux 或 U-Boot。
 
@@ -107,4 +129,4 @@ rollback 保留独立新文件，只恢复 uEnv；运行内核的变化发生在
 
 已用真实产物在临时模拟文件树执行 stage→activate→rollback，确认原文件和选择链接保留、重复运行不重写 Image，损坏模块/空间不足/非目标环境会拒绝，模拟替换后与状态写入失败会恢复配置。`tests/test_bsp_deployment.py` 共 7 项通过。测试不触碰真实板卡或云端系统启动目录，不能作为真实板卡启动/恢复成功的证据。
 
-实际 stage、切换、启动、外设回归与必要的恢复结果仍由后续实板输出验收。
+真实 stage 已由用户输出验收；切换、启动、外设回归与必要的恢复结果仍待后续实板输出。

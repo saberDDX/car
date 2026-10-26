@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-26",
+  "source": "User-provided board terminal output after updating to 46bb10f",
+  "release": "6.1.99-rk3576-car-bsp",
+  "phase": "staged",
+  "installed_module_count": 257,
+  "installed_boot_files": [
+    "/boot/Image-6.1.99-rk3576-car-bsp",
+    "/boot/initrd-6.1.99-rk3576-car-bsp"
+  ],
+  "active_uenv_changed": false,
+  "state_path": "/var/lib/car-bsp/6.1.99-rk3576-car-bsp/state.json",
+  "scope": "Real staging completed; no experimental kernel boot or partition restoration demonstrated."
+}
