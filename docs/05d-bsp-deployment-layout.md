@@ -94,7 +94,7 @@ python3 scripts/prepare-bsp-initrd.py \
 
 Windows boot 备份校验、MASKROM 识别和退出后旧系统启动已通过。本次不修改 U-Boot、分区表或根文件系统，优先调查官方 Recovery 按键进入的 LOADER 通道：若现有 U-Boot 可提供 eMMC 访问，boot 分区恢复可能不需要另找 MASKROM 下载用 loader。此方向还未实测，不能标为可用。
 
-下一步先取得用户 RKDevTool v3.37“高级功能”界面截图，核对实际按钮、存储选择、扇区地址和读回能力。打开页面本身不写入设备，无需为截图断电。随后再安排 Recovery/LOADER 识别及只读分区检查。MASKROM 作为独立的 ROM 识别通道已验证，但要让它访问 eMMC 仍需合适的下载 loader。
+已取得用户 RKDevTool v3.37“高级功能”界面截图，确认存在获取当前存储、读取Flash信息、导出镜像以及起始扇区/扇区数控件；此时底部没有发现设备，尚不能据此认定能读取 eMMC。下一步按 [Recovery/LOADER 只读步骤](05c-windows-usb-recovery-check.md) 核对模式与目标存储，再安排扇区读取。MASKROM 作为独立的 ROM 识别通道已验证，但要让它访问 eMMC 仍需合适的下载 loader。
 
 已有 boot 分区几何为起始 LBA 32768（0x8000）、长度 262144（0x40000）个 512-byte 扇区。该换算是板卡布局事实，不是授权用户直接按这些数值写入：必须先核对 Windows 工具的单位、当前目标存储和只读结果。压缩备份必须恢复为原始分区镜像才能用于原始块写回；不能写入整个磁盘的 LBA 0。
 
@@ -102,5 +102,5 @@ Windows boot 备份校验、MASKROM 识别和退出后旧系统启动已通过�
 
 - 已完成：ARM64 构建、离线模块/DTB/overlay 检查、boot 备份、Windows SHA256 校验、MASKROM 识别、返回原系统、上述部署输入检查。
 - 已进一步完成：initrd 内容分析、匹配模块替换和独立新 initrd、含 initrd 的离线包、实际文件大小预算。
-- 进行中：Recovery/LOADER 定点回退方法、最终部署时的可用空间复核。用户当前提供的是“下载镜像”页截图，“高级功能”页控件仍需核对。
+- 进行中：Recovery/LOADER 定点回退方法、最终部署时的可用空间复核。高级功能控件已核对，待实际 LOADER 识别和存储信息。
 - 未执行：新内核安装、启动切换、实板回归或分区恢复。
