@@ -102,6 +102,7 @@ Windows boot 备份校验、MASKROM 识别和退出后旧系统启动已通过�
 
 - 已完成：ARM64 构建、离线模块/DTB/overlay 检查、boot 备份、Windows SHA256 校验、MASKROM 识别、返回原系统、上述部署输入检查。
 - 已进一步完成：initrd 内容分析、匹配模块替换和独立新 initrd、含 initrd 的离线包、实际文件大小预算。
-- Recovery/LOADER 已实测识别，FlashInfo 读取成功，0x7550000 个扇区与约 58.7GiB eMMC 容量相符；待当前存储返回与小范围 GPT 导出进一步核对目标和扇区输入规则。
+- Recovery/LOADER 已实测识别，FlashInfo 读取成功，0x7550000 个扇区与约 58.7GiB eMMC 容量相符，存储列表截图选中 EMMC。
+- 小范围 GPT 导出进一步通过：主 GPT header 和全 entry array CRC 正确，分区 2 boot 的起点/长度与 Linux 报告一致，20,480-byte 文件证实导出扇区数 40 按十进制处理。下一步只读导出 128MiB boot 并与 Windows 原备份核对文件系统身份，脚本已准备。
 - 进行中：定点回退方法和最终部署时的可用空间复核，尚未验证实际分区恢复。
 - 未执行：新内核安装、启动切换、实板回归或分区恢复。

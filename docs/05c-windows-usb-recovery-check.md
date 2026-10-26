@@ -111,4 +111,37 @@ Flash CS:      0
 
 这次操作只读 eMMC，写入的是 Windows 导出文件。没有执行 boot 分区写入、恢复或新内核启动。
 
-PDF 展示的是完整 update 固件升级，没有提供我们 128MiB boot 分区镜像的定点写回流程。不能把 original-boot.img 当完整固件、从扇区 0 写入。已记录分区起始扇区 32768（512 字节单位），但具体工具地址单位、目标存储及 loader 流程还需进一步核对，本文不提供写入命令。
+### 小范围 GPT 实测结果
+
+用户上传 `ExportImage.img`，20,480 bytes，SHA256 为 `6022cb43f828e7f337b6a84c090e075a66c245afe460709daeab0b9e4244c9e9`。结合输入的扇区数文本 `40`，该导出长度符合十进制 40 × 512 bytes；尚不能只由起始值 0 判断“起始扇区”输入框的进制。
+
+- protective MBR 标记 `55aa` 与 0xee 分区类型存在。
+- 主 GPT header 位于 LBA 1，大小 92 bytes，header CRC 校验通过。
+- entry array 位于 LBA 2，128 个 128-byte entries，整个 entry array CRC 通过。
+- backup GPT LBA 为 123,011,071，总扇区数 123,011,072，与 LOADER FlashInfo 相同；本次只检查主表，没有读到或验证磁盘末尾的备份 GPT。
+- 用户同时补充的存储列表截图选中 `2. EMMC`。结合与 Linux 报告相同的容量和以下分区几何，目标存储对应关系已进一步确认。
+
+| GPT 分区 | 名称 | 起始 LBA | 扇区数（512-byte） | 字节数 |
+| --- | --- | --- | --- | --- |
+| 1 | uboot | 16384 | 16384 | 8,388,608 |
+| 2 | boot | 32768 | 262144 | 134,217,728 |
+| 3 | rootfs | 294912 | 122716127 | 62,830,657,024 |
+
+结果记录为 `bsp/gpt-readback-result.json`，不公开原始磁盘 GUID 或分区 UUID。
+
+### 下一步：完整 boot 只读导出与 Windows 检查
+
+保持 LOADER/EMMC，在高级功能中填写起始扇区 `32768`、扇区数 `262144`，只点“导出镜像”。完整导出应为 134,217,728 bytes，另命名 `boot-readback.img`。此举不写 eMMC，也不覆盖原始 boot 备份。起始输入是否按预期处理，将进一步用实际导出文件的 ext2 特征验证。
+
+在 Windows 运行 `scripts/check-bsp-boot-readback.ps1`，可通过文件选择窗口选新导出文件。脚本优先寻找 Downloads 中已校验的 original-boot.img.gz；不存在时再弹窗选择。它只读取这些 Windows 文件，并写一份 JSON 报告：
+
+1. 核对导出精确为 128MiB，防止误选之前 20KiB 的 GPT 文件。
+2. 再核对 original-boot.img.gz 的已知 SHA256，仅读取其解压后前 4096 bytes，不整盘解压。
+3. 比较两个文件的 ext2 magic、文件系统 UUID 及固定几何字段，确认导出对应原 boot 文件系统。
+4. 输出新完整导出的 SHA256 及其是否等于原始 raw 备份 SHA256。
+
+重启和重新挂载会改变 ext2 的挂载时间、计数等元数据，因此新导出不必与较早快照哈希相同。若原始哈希不等但上述身份/几何相同，只能证明同一文件系统与读回定位，不能声称整个文件系统内容没变化。脚本会明确输出此边界；失败时不继续切换启动或写回。
+
+脚本不调用 RKDevTool、不打开物理磁盘、不修改设备或执行上传文件中的程序。当前云端没有 Windows PowerShell，脚本完成代码核对，Windows 实际运行结果待用户返回。
+
+PDF 展示的是完整 update 固件升级，没有提供我们 128MiB boot 分区镜像的定点写回流程。不能把 original-boot.img 当完整固件、从扇区 0 写入。GPT 已验证 boot 几何，后续仍需完成完整读回核对并明确“下载镜像”页面的地址写入操作；高级功能导出框和下载页面的地址框不能仅凭相似外观就假定进制相同。本文目前不提供写入命令。

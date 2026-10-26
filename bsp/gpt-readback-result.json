@@ -1,0 +1,35 @@
+{
+  "input_bytes": 20480,
+  "input_sha256": "6022cb43f828e7f337b6a84c090e075a66c245afe460709daeab0b9e4244c9e9",
+  "input_start_text": "0",
+  "input_count_text": "40",
+  "count_field_radix_observed": 10,
+  "sector_bytes": 512,
+  "primary_gpt_header_crc_ok": true,
+  "primary_gpt_entries_crc_ok": true,
+  "total_sectors": 123011072,
+  "partitions": [
+    {
+      "number": 1,
+      "name": "uboot",
+      "start_sector": 16384,
+      "sector_count": 16384,
+      "bytes": 8388608
+    },
+    {
+      "number": 2,
+      "name": "boot",
+      "start_sector": 32768,
+      "sector_count": 262144,
+      "bytes": 134217728
+    },
+    {
+      "number": 3,
+      "name": "rootfs",
+      "start_sector": 294912,
+      "sector_count": 122716127,
+      "bytes": 62830657024
+    }
+  ],
+  "scope": "Read-only primary GPT inspection; backup GPT and partition restoration not tested."
+}
