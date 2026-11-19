@@ -12,5 +12,7 @@
   "frames_captured": 0,
   "cause": "NOT_CONFIRMED: initial discovery discarded open/capability/format errors",
   "code_review_finding": "Existing Qt launcher grants a temporary scoped camera ACL; first NPU launcher omitted this integration",
-  "follow_up": "Add per-device diagnostics and scoped ACL handling; require a new board run to establish the actual cause and capture result"
+  "later_user_clarification": "User stated the USB camera had not been plugged in during this failed attempt",
+  "later_result": "After connection, /dev/video0 was selected with existing permissions and completed 105 frames; see board-camera-smoke.json",
+  "follow_up": "Original error and unknown-at-the-time diagnosis retained; do not attribute this incident to proven ACL failure"
 }
