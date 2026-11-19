@@ -6,30 +6,31 @@
  * Numeric cells avoid requiring the full kernel source to compile this overlay.
  * 1 = GPIO_ACTIVE_LOW; 212 = KEY_CAMERA; mux 0 = RK_FUNC_GPIO.
  */
+ //这份不是“完整设备树”，而是一个 Device Tree Overlay（设备树插件），作用是：在 LubanCat-3 原有设备树上，额外添加一个 GPIO 按键设备，并把 GPIO4_A6 配成上拉输入。
 / {
-	compatible = "embedfire,rk3576-lubancat-3";
+       compatible = "embedfire,rk3576-lubancat-3";//overlay 根节点的 compatible
 
-	fragment@0 {
+       fragment@0 {//创建一个 GPIO 按键设备节点，也就是告诉内核有这么一个设备，它用哪个 GPIO、低电平有效、键值是什么、消抖多久、使用哪套 pinctrl
 		target-path = "/";
 		__overlay__ {
 			car_camera_key: car-camera-key {
 				compatible = "saberddx,car-gpio-key";
-				button-gpios = <&gpio4 6 1>;
-				linux,code = <212>;
+                               button-gpios = <&gpio4 6 1>;//1 对应 GPIO_ACTIVE_LOW：GPIO4_A6 低电平有效；本文件由 dtc 直接编译，保留数字。
+                               linux,code = <212>;//逻辑按键类型
 				debounce-interval = <20>;
 				pinctrl-names = "default";
 				pinctrl-0 = <&car_key_pin>;
-				status = "okay";
+                               status = "okay";//启用
 			};
 		};
 	};
 
-	fragment@1 {
+       fragment@1 {//配置这个按键所占用的物理引脚怎么工作
 		target = <&pinctrl>;
 		__overlay__ {
 			car-keys {
 				car_key_pin: car-key-pin {
-					rockchip,pins = <4 6 0 &pcfg_pull_up>;
+                                       rockchip,pins = <4 6 0 &pcfg_pull_up>;//GPIO4_A6 这个物理引脚使用 GPIO 功能，并开启内部上拉
 				};
 			};
 		};

@@ -70,14 +70,14 @@ bool V4L2Thread::openCamera()
             candidates << "/dev/" + entry;
     }
     for (const QString &path : candidates) {
-        const int candidate = ::open(QFile::encodeName(path).constData(), O_RDWR | O_NONBLOCK | O_CLOEXEC);
+        const int candidate = ::open(QFile::encodeName(path).constData(), O_RDWR | O_NONBLOCK | O_CLOEXEC);//1，打开设备
         if (candidate < 0) {
             if (!explicitPath.isEmpty())
                 return fail("无法打开摄像头 " + path);
             continue;
         }
         v4l2_capability caps = {};
-        if (cameraIoctl(candidate, VIDIOC_QUERYCAP, &caps) < 0) {
+        if (cameraIoctl(candidate, VIDIOC_QUERYCAP, &caps) < 0) {//2，查询能力  对 candidate 这个摄像头设备发送 VIDIOC_QUERYCAP 命令，并把结果写进 caps
             const int saved = errno;
             ::close(candidate);
             if (!explicitPath.isEmpty()) { errno = saved; return fail("无法查询摄像头能力"); }
@@ -111,7 +111,7 @@ bool V4L2Thread::openCamera()
     return false;
 }
 
-bool V4L2Thread::initCamera()
+bool V4L2Thread::initCamera()//3，设置格式
 {
     if (!openCamera())
         return false;
@@ -131,9 +131,9 @@ bool V4L2Thread::initCamera()
         emit captureError("摄像头返回了不支持的图像格式或尺寸。");
         return false;
     }
-    v4l2_requestbuffers request = {};
-    request.count = 4;
-    request.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    v4l2_requestbuffers request = {};//4，申请缓冲区
+    request.count = 4;//请求驱动准备四个采集缓冲区，因为摄像头不断产生图像，而程序处理图像也需要时间。多个缓冲区允许驱动采集下一帧时，应用处理已经完成的一帧，减少互相等待。
+    request.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;//要的是“视频采集队列”的 buffer。
     request.memory = V4L2_MEMORY_MMAP;
     if (cameraIoctl(fd, VIDIOC_REQBUFS, &request) < 0)
         return fail("申请摄像头缓冲区失败");
@@ -147,10 +147,11 @@ bool V4L2Thread::initCamera()
         buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buffer.memory = V4L2_MEMORY_MMAP;
         buffer.index = i;
-        if (cameraIoctl(fd, VIDIOC_QUERYBUF, &buffer) < 0)
+        if (cameraIoctl(fd, VIDIOC_QUERYBUF, &buffer) < 0)//驱动，请告诉我“视频采集队列”中第 i 个 MMAP buffer 的信息。
             return fail("查询摄像头缓冲区失败");
-        void *mapping = mmap(nullptr, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buffer.m.offset);
-        if (mapping == MAP_FAILED)
+        void *mapping = mmap(nullptr, buffer.length, PROT_READ | PROT_WRITE, MAP_SHARED, fd, buffer.m.offset);//把这个具体 buffer 映射到用户空间
+        //内核已经准备了采集缓冲区，mmap 让应用能够通过自己的虚拟地址访问这些缓冲区。相比使用 read() 把一帧复制到另外一块用户缓冲区，MMAP 可以避免这一环节的数据复制。
+        if (mapping == MAP_FAILED)//v4l2_buffer 保存元数据；mapping 是映射区起始地址，缓冲区不一定已包含有效帧。
             return fail("映射摄像头缓冲区失败");
         buffers[i].start = mapping;
         buffers[i].length = buffer.length;
