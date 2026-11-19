@@ -38,6 +38,8 @@ inline cv::Mat copy_yuyv_to_bgr(const void* memory,std::size_t mapped,std::size_
 }
 struct CameraFrame {
     cv::Mat bgr;
+    std::vector<unsigned char> raw_yuyv; // Diagnostic-only copy, disabled during normal inference.
+    unsigned width=0,height=0,stride=0;
     uint32_t sequence=0;
     long long timestamp_ns=0;
     bool monotonic=false;
@@ -67,7 +69,8 @@ class V4L2Capture {
         }
         const unsigned features=(caps.capabilities&V4L2_CAP_DEVICE_CAPS)?caps.device_caps:caps.capabilities;
         const std::string driver(reinterpret_cast<const char*>(caps.driver),strnlen(reinterpret_cast<const char*>(caps.driver),sizeof(caps.driver)));
-        std::cerr<<"camera_probe device="<<path<<" driver="<<driver;
+        const std::string card(reinterpret_cast<const char*>(caps.card),strnlen(reinterpret_cast<const char*>(caps.card),sizeof(caps.card)));
+        std::cerr<<"camera_probe device="<<path<<" driver="<<driver<<" card="<<card;
         if(!(features&V4L2_CAP_VIDEO_CAPTURE) || !(features&V4L2_CAP_STREAMING) ||
            (require_uvc && driver!="uvcvideo")) {
             std::cerr<<" rejected=not_required_capture_streaming_uvc\n";
@@ -160,7 +163,24 @@ public:
     ~V4L2Capture(){release();}
     V4L2Capture(const V4L2Capture&)=delete;
     V4L2Capture& operator=(const V4L2Capture&)=delete;
-    bool read(CameraFrame& frame,const volatile std::sig_atomic_t& stop) {
+    void print_controls(std::ostream& output) const {
+        for(const uint32_t id:{V4L2_CID_EXPOSURE_AUTO,V4L2_CID_EXPOSURE_ABSOLUTE,V4L2_CID_EXPOSURE_AUTO_PRIORITY,
+                              V4L2_CID_GAIN,V4L2_CID_BRIGHTNESS,V4L2_CID_CONTRAST,V4L2_CID_GAMMA,
+                              V4L2_CID_AUTO_WHITE_BALANCE,V4L2_CID_WHITE_BALANCE_TEMPERATURE}) {
+            v4l2_queryctrl query{};query.id=id;
+            if(call(fd_,VIDIOC_QUERYCTRL,&query)<0 || query.flags&V4L2_CTRL_FLAG_DISABLED) continue;
+            v4l2_control control{};control.id=id;
+            if(call(fd_,VIDIOC_G_CTRL,&control)<0) continue;
+            output<<"control="<<reinterpret_cast<const char*>(query.name)<<" value="<<control.value
+                  <<" min="<<query.minimum<<" max="<<query.maximum<<" default="<<query.default_value;
+            if(query.type==V4L2_CTRL_TYPE_MENU) {
+                v4l2_querymenu menu{};menu.id=id;menu.index=control.value;
+                if(call(fd_,VIDIOC_QUERYMENU,&menu)==0) output<<" menu="<<reinterpret_cast<const char*>(menu.name);
+            }
+            output<<'\n';
+        }
+    }
+    bool read(CameraFrame& frame,const volatile std::sig_atomic_t& stop,bool copy_raw=false) {
         const auto deadline=std::chrono::steady_clock::now()+std::chrono::seconds(5);
         while(!stop) {
             if(std::chrono::steady_clock::now()>=deadline) throw std::runtime_error("camera returned no valid frame for five seconds");
@@ -176,6 +196,11 @@ public:
             const bool valid=(buffer.flags&V4L2_BUF_FLAG_ERROR)==0;
             if(valid) {
                 frame.bgr=copy_yuyv_to_bgr(buffers_[buffer.index].data,buffers_[buffer.index].size,buffer.bytesused,width_,height_,stride_);
+                frame.width=width_;frame.height=height_;frame.stride=stride_;
+                if(copy_raw) {
+                    const auto* data=static_cast<const unsigned char*>(buffers_[buffer.index].data);
+                    frame.raw_yuyv.assign(data,data+buffer.bytesused);
+                } else frame.raw_yuyv.clear();
                 frame.sequence=buffer.sequence;
                 frame.monotonic=(buffer.flags&V4L2_BUF_FLAG_TIMESTAMP_MASK)==V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
                 frame.start_of_exposure=(buffer.flags&V4L2_BUF_FLAG_TSTAMP_SRC_MASK)==V4L2_BUF_FLAG_TSTAMP_SRC_SOE;

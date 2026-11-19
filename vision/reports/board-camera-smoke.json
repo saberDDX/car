@@ -36,9 +36,10 @@
   "saved_image": "/home/cat/car-driver-dev/build/vision/result-camera.jpg",
   "camera_run": "COMPLETED",
   "single_thread": true,
+  "later_visual_feedback": "User reported a white/blank saved result. Valid camera-scene detection is not accepted; see board-camera-white-frame.json",
   "limitations": [
     "Only about 3.4 seconds of measurement; no long-duration stability claim",
-    "Last-frame scene content and visible-target detection correctness await confirmation",
+    "User reports a white/blank frame; original pixel statistics and root cause await capture-only diagnostics",
     "Driver SOE-to-postprocess age is not glass-to-glass latency",
     "Zero sequence gaps does not establish all possible hardware or application loss mechanisms are absent",
     "Preview, interrupted stop, repeated reopening and unplug handling have not been reported"

@@ -1,0 +1,11 @@
+{
+  "date": "2026-11-19",
+  "source": "User reported result-camera.jpg is blank/white and attached an image showing a white view",
+  "original_jpeg_available_in_cloud": false,
+  "status": "OPEN",
+  "previous_transport_result": "105 frames processed and inference calls completed; no sequence gaps observed in the short run",
+  "image_quality_acceptance": "NOT_PASSED",
+  "cause": "NOT_CONFIRMED",
+  "next_step": "Inspect actual saved JPEG pixels, capture without NPU, retain raw YUYV and converted PNG, read exposure controls without changing them",
+  "quantization_comparison": "deferred until capture image is usable"
+}

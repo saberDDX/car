@@ -2,7 +2,39 @@
 
 当前交付：C++ Runtime 加载检查、YOLOv5n 导出与 RKNN 转换脚本、
 两份 RK3576 模型、C++ 图片/摄像头推理、云端正确性测试和基础计时。
-**板端 INT8 静态图及 100 帧单线程摄像头采集/推理已运行通过；摄像头目标检测效果的视觉核对、非量化模型对照和量化精度评估待完成。**
+**板端 INT8 静态图已通过；摄像头虽完成 100 帧运行，但用户反馈结果图全白，图像质量验收未通过。先定位采集问题，暂缓量化性能对比。**
+
+## 当前优先事项：白色画面诊断
+
+用户反馈 `result-camera.jpg` 为白色，[问题记录](reports/board-camera-white-frame.json)保留该反馈。
+此前日志只能证明帧长度和接口调用通过，不能证明获得了有效场景。
+目前没有证据直接归因于曝光、YUYV 转换或显示工具，不修改曝光参数来碰运气。
+
+在板端关闭其他摄像头程序，镜头对准有明显轮廓的物体，执行：
+
+```sh
+git pull --ff-only
+sh scripts/diagnose-npu-camera.sh
+```
+
+此程序不加载 RKNN 模型，读取已有结果 JPG 的像素统计，再直接采集 60 帧。
+第 1、30、60 帧各保存推理前的 PNG、原始 `.yuyv` 和尺寸/stride/统计文本。
+输出位于新建的 `build/vision/camera-diagnostics/capture-*/`，不会覆盖原结果图。
+`build/vision/camera-diagnostics/latest/` 指向这一轮目录，便于直接打开 `latest/frame-60.png`。
+控制参数只执行 QUERYCTRL/G_CTRL/QUERYMENU，不写曝光、增益或白平衡值。
+摄像头格式仍为原先的 YUYV 640×480 请求，按返回的尺寸和 stride 解析。
+权限与其他摄像头脚本相同，仅在需要时临时授权并恢复。
+
+重点看：
+
+- `mean_BGR` / `std_BGR` / `near_white_percent`：确认实际图像是否接近均匀白色。
+- `raw_channel=Y/U/V`：检查原始字节的亮度和色度是否与转换结果相符。
+- `controls_before_capture/after_capture`：检查当前曝光模式、曝光时间、增益等可读取值。
+- `frame-1.png` 与 `frame-60.png`：观察启动后是否逐渐恢复正常画面。
+
+白色原始画面可能来自场景或摄像头设置；若原始 YUYV 有正常变化而转换图发白，
+则继续检查格式/stride/转换。若文件像素正常而查看器仍白，则排查实际打开文件和显示路径。
+这些是后续诊断分支，不是已确认原因。诊断代码的合成白/黑图及 raw 统计测试通过，实板结果待回传。
 
 ## 已收到的板端结果
 
@@ -22,7 +54,7 @@ output_get 均值 7.931 ms。详细数据见 [原始范围归档](reports/board-
 接上摄像头后，用户回传 `/dev/video0`、UVC/YUYV 640×480、stride=1280、4 个 MMAP buffer，
 5 帧预热后完成 100 帧测量：约 3.368 秒、29.687 completed detection FPS，sequence gaps/anomalies 均为 0。
 rknn_run 均值 11.442 ms、processing 均值 23.085 ms，驱动 MONOTONIC/SOE 时间戳到后处理均值 57.642 ms。
-最后一帧检测数为 0；是否存在可见行人/车辆尚待看图确认。
+最后一帧检测数为 0；用户后续反馈图片全白，不能作为有效行人/车辆检测性能结果。
 见 [摄像头短跑记录](reports/board-camera-smoke.json)。这没有覆盖长时内存、反复重开、断开或预览测试。
 
 ## 下一步：同图 FP/INT8 对比
@@ -270,4 +302,4 @@ RKNN SDK 和 Runtime 受 Rockchip 自身条款约束，未将其头文件或运�
 
 ## 接下来
 
-确认摄像头画面中的目标检测结果，再完成 FP/INT8 板端对照；按实测数据选择是否还有必要做进一步优化。
+先解决白色画面并核对摄像头可见目标，再完成 FP/INT8 板端对照；按实测数据决定后续优化。

@@ -76,5 +76,6 @@ M0 通过条件：真实板端成功加载匹配的 RKNN 模型、查询 SDK/dri
 首次真实摄像头尝试停在自动发现 `found 0`，用户随后确认当时没有连接摄像头；失败记录保留。
 新版本另补齐诊断和临时 ACL 流程。接入摄像头后用户回传现有权限下成功完成 105 帧，
 其中 100 帧计时、29.687 completed detection FPS；未使用或实测临时权限恢复。
-见 [摄像头记录](../vision/reports/board-camera-smoke.json)。最后一帧目标数 0，画面核对待确认。
-FP/INT8 对比脚本已准备，板端对比及摄像头可见目标验证待完成，尚不将整个视觉模块写为验收完成。
+见 [摄像头记录](../vision/reports/board-camera-smoke.json)。最后一帧目标数 0，用户随后反馈结果图全白。
+当前先执行 `sh scripts/diagnose-npu-camera.sh`，不调用 NPU，保存原始 YUYV/转换图与只读曝光信息。
+白色原因未确认，图像质量验收未通过；FP/INT8 对比暂缓，尚不将整个视觉模块写为验收完成。
