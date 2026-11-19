@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-19",
+  "source": "User-pasted output from the LubanCat-3 board; not a cloud hardware run",
+  "application_commit": "fa203eb07fbd8c8d5ac8f08fee2e05f90951d464",
+  "runtime": "2.1.0 (967d001cc8@2024-08-07T19:28:19)",
+  "driver": "0.9.8",
+  "model": "yolov5n-rk3576-int8.rknn",
+  "model_checksum_check": "OK",
+  "postprocess_ctest_on_board": "1/1 passed",
+  "model_init_ms": 37.405,
+  "output_heads": [
+    {"shape": [1,255,80,80], "type": 2, "zero_point": -128, "scale": 0.00391508},
+    {"shape": [1,255,40,40], "type": 2, "zero_point": -128, "scale": 0.00392157},
+    {"shape": [1,255,20,20], "type": 2, "zero_point": -128, "scale": 0.00392157}
+  ],
+  "warmup": 1,
+  "measured_repetitions": 3,
+  "timing_ms": {
+    "preprocess": {"mean": 1.843, "p50": 1.336, "p95": 2.899, "max": 2.899},
+    "input_set": {"mean": 0.471, "p50": 0.470, "p95": 0.480, "max": 0.480},
+    "rknn_run": {"mean": 11.473, "p50": 11.516, "p95": 12.215, "max": 12.215},
+    "output_get": {"mean": 7.931, "p50": 5.955, "p95": 11.987, "max": 11.987},
+    "postprocess": {"mean": 1.216, "p50": 1.258, "p95": 1.266, "max": 1.266},
+    "processing": {"mean": 22.933, "p50": 21.096, "p95": 27.998, "max": 27.998}
+  },
+  "detections": [
+    {"class": 0, "name": "person", "confidence": 0.816, "xyxy": [109.667,237.225,203.744,532.971]},
+    {"class": 0, "name": "person", "confidence": 0.808, "xyxy": [209.543,240.954,287.273,511.360]},
+    {"class": 0, "name": "person", "confidence": 0.622, "xyxy": [483.519,224.215,563.696,514.546]},
+    {"class": 5, "name": "bus", "confidence": 0.497, "xyxy": [115.280,142.686,565.002,456.027]}
+  ],
+  "inference": "PASS",
+  "saved_image": "/home/cat/car-driver-dev/build/vision/result-int8.jpg",
+  "visual_image_inspection": "NOT_YET_REPORTED",
+  "limitations": [
+    "One fixed sample, three measured repetitions; not stable performance or dataset accuracy evidence",
+    "Processing excludes initialization, input file I/O, output release, drawing, saving and display",
+    "Camera integration and non-quantized board inference are not covered by this result"
+  ]
+}

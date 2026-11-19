@@ -7,7 +7,9 @@
 - `yolov5n-rk3576-int8.rknn`：使用 20 张示例校准图的 PTQ INT8 构建。
 - `SHA256SUMS` 与同名 JSON：模型摘要、工具链与校准输入记录。
 
-**两份模型均尚未在用户 RK3576 上完成真实推理验证。**
+INT8 模型已由用户在 RK3576 回传一次真实静态图推理成功记录，
+见 [板端记录](../reports/board-int8-smoke.json)。非量化模型板端运行仍待验证。
+两者的完整精度对比、稳定性能与摄像头实测仍待完成。
 原始权重为官方 YOLOv5 v6.2 `yolov5n.pt`，SHA-256：
 `4f180cf23ba0717ada0badd6c685026d73d48f184d00fc159c2641284b2ac0a3`。
 来源：https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5n.pt 。

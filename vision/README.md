@@ -1,8 +1,61 @@
-# RK3576 行人／车辆检测：静态图片阶段
+# RK3576 行人／车辆检测：图片与单线程摄像头
 
 当前交付：C++ Runtime 加载检查、YOLOv5n 导出与 RKNN 转换脚本、
-两份 RK3576 模型、C++ 图片推理/后处理、云端正确性测试和基础计时。
-**板端真实推理待执行；摄像头整合、多线程和量化精度评估尚未完成。**
+两份 RK3576 模型、C++ 图片/摄像头推理、云端正确性测试和基础计时。
+**板端 INT8 静态图推理已通过；摄像头真实运行、非量化模型对照、多线程和量化精度评估待完成。**
+
+## 已收到的板端结果
+
+用户在 `fa203eb` 版本回传 Runtime 2.1.0、driver 0.9.8，模型初始化成功，
+INT8 检出 3 person + 1 bus；类别与数量对应云端参考。
+一次预热、三次测量的 rknn_run 均值 11.473 ms，processing 均值 22.933 ms，
+output_get 均值 7.931 ms。详细数据见 [原始范围归档](reports/board-int8-smoke.json)。
+这是单图功能 smoke test，不能作为稳定性能、摄像头 FPS 或数据集精度结论。
+结果图已经由程序保存，用户视觉核对尚未回传。
+
+## 下一步：单线程 USB 摄像头
+
+先关闭原 Qt 程序里的摄像头窗口，避免与新程序争用摄像头。在板卡仓库内执行：
+
+```sh
+git pull --ff-only
+sh scripts/run-npu-camera.sh
+```
+
+默认只在可访问的 YUYV UVC 摄像头恰好有一个时自动选择，申请 640×480，
+使用驱动实际返回的尺寸与 bytesperline。5 帧预热后测量 100 帧，保存最后一帧
+`build/vision/result-camera.jpg`。默认没有 GUI、录像或推流，运行完自动释放资源。
+如果多设备或权限/占用导致无法自动选择，保留输出，再指定正确设备，例如：
+
+```sh
+sh scripts/run-npu-camera.sh /dev/video0
+```
+
+这里 `/dev/video0` 只是例子，以实际枚举为准，不把第一个 video 节点当成摄像头。
+在已有桌面终端、OpenCV highgui 可用时，可选择预览 300 帧：
+
+```sh
+sh scripts/run-npu-camera.sh auto 300 1
+```
+
+`q`/Esc 或 Ctrl+C 可停止；停止后仍保存最后成功处理的画面。
+没有 DISPLAY/WAYLAND_DISPLAY 时拒绝打开预览，不改变桌面配置。
+
+当前实现沿用原采集流程的要点：能力检查 → S_FMT → REQBUFS → QUERYBUF/
+MMAP → QBUF → STREAMON → poll/DQBUF → YUYV 转为自有 BGR 图像 → QBUF → 推理。
+归还缓冲区之后，推理不再引用 MMAP 地址。结束/异常时清理 STREAMOFF、映射和 fd。
+没有增加采集线程、零拷贝、热插拔自动重连，也没有修改已有 Qt 摄像头或按键驱动。
+
+新增统计：
+
+- `capture_wait_convert_ms`：poll/DQBUF 等待、YUYV 转换及 QBUF 的合计耗时。
+- `completed_detection_fps`：测量窗口内完成检测的帧数/墙钟时间，包含等待、
+  输出释放和可选预览；不是传感器实际采集 FPS，也不是 rknn_run 耗时的倒数。
+- `driver_timestamp_to_postprocess_ms`：仅在驱动声明 MONOTONIC 时，统计驱动时间戳
+  到后处理结束的间隔；记录 SOE/EOF/default 来源，不称为摄像头到屏幕的总延迟。
+- `sequence_gaps`：已取出帧的 sequence 间隙；不等于应用精确统计了所有硬件丢帧原因。
+
+摄像头代码仅云端构建及辅助测试通过；真实采集、预览、Ctrl+C、重开和断开行为均待板端验收。
 
 ## 板卡运行
 
@@ -88,7 +141,9 @@ build/vision/detect_image --model vision/models/yolov5n-rk3576-int8.rknn \
 2026-11-19，Debian 13 x86_64，g++ 14.2、OpenCV 4.10：
 
 - CMake 构建检查器和图片推理程序成功。
-- 现有新增 CTest 1/1 通过：anchor/grid 解码、NCHW 索引、置信度、类别过滤、跨类别 NMS。
+- 摄像头改版后的 CTest 2/2 通过：anchor/grid 解码、NCHW 索引、置信度、类别过滤、跨类别 NMS，
+  另包括 YUYV 行填充/长度/内存所有权及 50 次非摄像头设备初始化失败的 fd 清理。
+  后一测试不模拟完整 MMAP/STREAMON 路径，不能替代真实摄像头验收。
 - 加载器的 host fixture 检查：库缺失、符号缺失、正常符号集合、参数错误，全部通过。
   fixture 不实现 NPU，没有用它替代板端推理验收。
 - 一张官方示例图上，适配后的 PyTorch 与 ONNX Runtime 的输出一致，
@@ -97,7 +152,7 @@ build/vision/detect_image --model vision/models/yolov5n-rk3576-int8.rknn \
   约 3.4e-5 像素；[参考检测](reports/onnx-detections.json)为 3 person + 1 bus。
 - 非量化与 INT8 模型转换成功。INT8 使用官方 Model Zoo 的 20 张 COCO 子集图片，
   先按相同策略 letterbox；[来源摘要](reports/calibration-sources.json)。
-- 以上没有证明 NPU 效果、板端耗时、量化精度或摄像头链路通过。
+- 以上为云端证据；板端 INT8 图片结果另行归档，量化精度、稳定性能与摄像头链路待验收。
 
 ## 转换环境与复现
 
@@ -167,5 +222,4 @@ RKNN SDK 和 Runtime 受 Rockchip 自身条款约束，未将其头文件或运�
 
 ## 接下来
 
-先回传真实板端 API/driver 版本、张量信息、检测结果、错误和结果图。
-确认推理契约正确后再接现有 V4L2 数据源，最后做 FP/INT8 的板端对照与性能定位。
+先验收单线程摄像头，包括结果图、正常结束/停止后重开；随后做 FP/INT8 的板端对照与性能定位。

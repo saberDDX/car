@@ -24,12 +24,13 @@
   节点为 root:render、0660，另有 ACL；当前用户实际可访问性仍待确认。
 - `/lib/librknnrt.so` 是 AArch64 ELF，大小 7155496 字节；strings 提取到
   `librknnrt version: 2.1.0 (967d001cc8@2024-08-07T19:28:19)`。
-  这是文件内版本线索，尚未验证程序实际加载的库及其 SDK 查询结果。
+  后续用户回传的真实模型 SDK 查询也确认了同一版本字符串。
 - `/sys/module/rknpu/version` 返回 `0.9.8`；debugfs 版本路径权限不足。
   后者本身不是 NPU 故障证据，暂不修改权限或挂载 debugfs。
 - 板端 gcc、g++、cmake、pkg-config、python3 存在；OpenCV pkg-config 版本 4.5.4。
-- 待验证：动态库加载、实际设备访问、匹配模型初始化、SDK/driver 查询及推理。
-  没有安装或替换板端运行库/驱动。
+- 用户已回传 INT8 模型真实初始化、SDK/driver 查询和推理成功，输出 3 person + 1 bus。
+  [详细记录](../vision/reports/board-int8-smoke.json)仅覆盖一张图片和 3 次测量。
+  没有安装或替换板端运行库/驱动；结果图视觉核对、FP 模型对照和摄像头验收待完成。
 
 ## 第一项操作与知识点
 
@@ -70,6 +71,6 @@ M0 通过条件：真实板端成功加载匹配的 RKNN 模型、查询 SDK/dri
 根据用户授权，已实现 Runtime 加载检查、C++ 图片推理、匹配的模型转换流程。
 两份 RK3576 模型已转换，云端编译、后处理与 PyTorch/ONNX 对照通过。
 详细证据与运行步骤见 [vision/README.md](../vision/README.md)。
-板端同步后执行 `sh scripts/run-npu-image.sh`，获取真实版本、输出和结果图。
-加载检查明确打印 NOT_RUN；只有后续真实模型执行才能提供推理证据。
-摄像头整合和 FP/INT8 板端效果/性能比较待进行，M0 当前仍未验收通过。
+用户已执行 `sh scripts/run-npu-image.sh`，M0 的模型加载、实际版本查询与样例推理条件通过。
+接下来执行 `sh scripts/run-npu-camera.sh`；单线程 V4L2 接入代码已云端编译/测试，尚未实板运行。
+FP/INT8 板端效果/性能比较待进行，尚不将整个视觉模块写为验收完成。

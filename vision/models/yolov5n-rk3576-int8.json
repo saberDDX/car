@@ -87,5 +87,5 @@
       "sha256": "9c6984921cdf5cd6ed48442a070fcc38b68141aa6b0de271e2813aebea6b698b"
     }
   ],
-  "board_validation": "NOT_RUN"
+  "board_validation": "PASS: user-reported static-image inference on 2026-11-19; see ../reports/board-int8-smoke.json; camera and accuracy evaluation not covered"
 }
