@@ -17,7 +17,19 @@
   "reported_controls": {"auto_exposure": 3, "exposure_absolute": 5, "dynamic_framerate": 1, "gain": 192, "auto_white_balance": 1, "white_balance_temperature": 1070},
   "lens_cover_test": "User explicitly confirmed the lens was fully covered; reported pixel statistics remained the same",
   "interpretation": "Capture-only path reproduces white data before any NPU call; limited-range YUYV conversion legitimately clips these Y values to white. Underlying camera/driver/source reason remains unknown",
-  "user_clarification": "User had not opened the Qt camera interface and requests a standalone camera startup/live-preview check; indicator-light state was not observed",
-  "next_step": "First check the existing Qt live camera preview without NPU. If white persists, compare YUYV with independently decoded MJPG on the same device without writing exposure controls",
+  "qt_cross_check": "User subsequently ran the existing Qt app and supplied a white preview screenshot; logs show STREAMON and first frame received at 640x480 stride 1280",
+  "dual_format_check": {
+    "source": "User-uploaded diagnostic log for capture-j941906d and report that the image remains white",
+    "device": "/dev/video0",
+    "card": "UVC Camera (046d:0825)",
+    "frames_per_format": 60,
+    "sample_frames": [1,30,60],
+    "YUYV": {"mean_BGR_each_sample": [255,255,255], "near_white_percent_each_sample": 100, "raw_statistics": "same as raw_statistics_each_sample above"},
+    "MJPG": {"raw_bytes_frames_1_30_60": [6940,7190,7190], "mean_BGR_frame_60": [253.489,253.489,253.489], "std_BGR_frame_60": [0.565,0.565,0.565], "near_white_percent_each_sample": 100},
+    "control_observation": "Across YUYV capture, exposure_absolute changed from 166 to 5 and gain from 64 to 192 while auto_exposure remained 3; this diagnostic does not write controls. Does not establish which component caused the change",
+    "power_cycle_status": "USB disconnect/reconnect was requested; user has not explicitly confirmed performing it",
+    "scope": "Both formats produce near-white images on this board; hardware versus host/driver/control cause remains unconfirmed"
+  },
+  "next_step": "Test the same USB camera on a separate computer using its system camera application. If available, test a known-good second camera on the board. Avoid further NPU or display changes until the image source is isolated",
   "quantization_comparison": "deferred until capture image is usable"
 }
