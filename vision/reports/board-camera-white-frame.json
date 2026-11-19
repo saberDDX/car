@@ -6,6 +6,18 @@
   "previous_transport_result": "105 frames processed and inference calls completed; no sequence gaps observed in the short run",
   "image_quality_acceptance": "NOT_PASSED",
   "cause": "NOT_CONFIRMED",
-  "next_step": "Inspect actual saved JPEG pixels, capture without NPU, retain raw YUYV and converted PNG, read exposure controls without changing them",
+  "pixel_statistics_source": "User-pasted capture-only diagnostics; original JPEG bytes remain unavailable in cloud",
+  "previous_result": {"size": [640,480], "mean_BGR": [255,255,255], "std_BGR": [0,0,0], "near_white_percent": 100},
+  "yuyv_samples_at_frames": [1,30,60],
+  "raw_statistics_each_sample": {
+    "Y": {"min": 236, "max": 238, "mean": 237.490, "std": 0.562},
+    "U": {"min": 128, "max": 128, "mean": 128, "std": 0},
+    "V": {"min": 128, "max": 128, "mean": 128, "std": 0}
+  },
+  "reported_controls": {"auto_exposure": 3, "exposure_absolute": 5, "dynamic_framerate": 1, "gain": 192, "auto_white_balance": 1, "white_balance_temperature": 1070},
+  "lens_cover_test": "User explicitly confirmed the lens was fully covered; reported pixel statistics remained the same",
+  "interpretation": "Capture-only path reproduces white data before any NPU call; limited-range YUYV conversion legitimately clips these Y values to white. Underlying camera/driver/source reason remains unknown",
+  "user_clarification": "User had not opened the Qt camera interface and requests a standalone camera startup/live-preview check; indicator-light state was not observed",
+  "next_step": "First check the existing Qt live camera preview without NPU. If white persists, compare YUYV with independently decoded MJPG on the same device without writing exposure controls",
   "quantization_comparison": "deferred until capture image is usable"
 }

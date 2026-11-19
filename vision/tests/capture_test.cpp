@@ -19,6 +19,20 @@ int main(){
     rejected=false;
     try{carvision::copy_yuyv_to_bgr(raw.data(),raw.size(),12,3,2,8);}catch(const std::runtime_error&){rejected=true;}
     require(rejected,"odd YUYV width rejection");
+    cv::Mat source(8,16,CV_8UC3,cv::Scalar(40,100,180));
+    std::vector<unsigned char> encoded;
+    require(cv::imencode(".jpg",source,encoded),"JPEG fixture encode");
+    auto jpeg=carvision::copy_mjpeg_to_bgr(encoded.data(),encoded.size(),encoded.size(),16,8);
+    const auto color=jpeg.at<cv::Vec3b>(3,3);
+    require(std::abs(color[0]-40)<=3 && std::abs(color[1]-100)<=3 && std::abs(color[2]-180)<=3,"MJPG color decode");
+    rejected=false;
+    try{carvision::copy_mjpeg_to_bgr(encoded.data(),encoded.size(),encoded.size()+1,16,8);}catch(const std::runtime_error&){rejected=true;}
+    require(rejected,"MJPG bytesused bounds");
+    rejected=false;
+    try{carvision::copy_mjpeg_to_bgr(encoded.data(),encoded.size(),encoded.size(),8,8);}catch(const std::runtime_error&){rejected=true;}
+    require(rejected,"MJPG negotiated dimensions check");
+    std::fill(encoded.begin(),encoded.end(),0);
+    require(jpeg.at<cv::Vec3b>(3,3)==color,"decoded JPEG owns memory independently of queued buffer");
     const auto before=fd_count();
     for(int i=0;i<50;++i){
         rejected=false;
@@ -26,5 +40,5 @@ int main(){
         require(rejected,"reject non-camera device");
     }
     require(fd_count()==before,"failed camera construction must close descriptor");
-    std::cout<<"PASS: YUYV stride/ownership/bounds and failed-open descriptor cleanup; no real camera exercised\n";
+    std::cout<<"PASS: YUYV/MJPG conversion, bounds, ownership and failed-open descriptor cleanup; no real camera exercised\n";
 }

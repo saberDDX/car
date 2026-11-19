@@ -38,12 +38,12 @@ struct ChannelStatistics {
 };
 struct RawStatistics {ChannelStatistics y,u,v;};
 inline RawStatistics raw_statistics(const CameraFrame& frame) {
-    if(!frame.width || !frame.height || frame.width>4096 || frame.height>4096 || frame.width%2 || frame.stride<frame.width*2 ||
-       frame.raw_yuyv.size()<static_cast<std::size_t>(frame.height-1)*frame.stride+frame.width*2)
+    if(frame.pixel_format!=V4L2_PIX_FMT_YUYV || !frame.width || !frame.height || frame.width>4096 || frame.height>4096 || frame.width%2 || frame.stride<frame.width*2 ||
+       frame.raw_data.size()<static_cast<std::size_t>(frame.height-1)*frame.stride+frame.width*2)
         throw std::runtime_error("invalid diagnostic YUYV data");
     RawStatistics stats;
     for(unsigned row=0;row<frame.height;++row) {
-        const auto* data=frame.raw_yuyv.data()+static_cast<std::size_t>(row)*frame.stride;
+        const auto* data=frame.raw_data.data()+static_cast<std::size_t>(row)*frame.stride;
         for(unsigned x=0;x<frame.width;x+=2) {
             stats.y.add(data[2*x]);stats.u.add(data[2*x+1]);
             stats.y.add(data[2*x+2]);stats.v.add(data[2*x+3]);

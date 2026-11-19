@@ -1,6 +1,7 @@
 #pragma once
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/imgcodecs.hpp>
 #include <linux/videodev2.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -21,6 +22,9 @@
 #include <vector>
 
 namespace carvision {
+inline const char* capture_format_name(uint32_t format) {
+    return format==V4L2_PIX_FMT_YUYV?"YUYV":format==V4L2_PIX_FMT_MJPEG?"MJPG":"UNKNOWN";
+}
 inline long long monotonic_ns() {
     timespec value{};
     if(clock_gettime(CLOCK_MONOTONIC,&value)!=0) throw std::runtime_error("clock_gettime failed");
@@ -36,9 +40,19 @@ inline cv::Mat copy_yuyv_to_bgr(const void* memory,std::size_t mapped,std::size_
     cv::cvtColor(yuyv,bgr,cv::COLOR_YUV2BGR_YUYV);
     return bgr; // Owns converted pixels; no reference to the MMAP region remains.
 }
+inline cv::Mat copy_mjpeg_to_bgr(const void* memory,std::size_t mapped,std::size_t used,unsigned width,unsigned height) {
+    if(!memory || !used || used>mapped || used>static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
+       !width || !height || width>4096 || height>4096) throw std::runtime_error("invalid MJPG payload");
+    cv::Mat bytes(1,static_cast<int>(used),CV_8UC1,const_cast<void*>(memory));
+    cv::Mat image=cv::imdecode(bytes,cv::IMREAD_COLOR);
+    if(image.empty() || image.type()!=CV_8UC3 || image.cols!=static_cast<int>(width) || image.rows!=static_cast<int>(height))
+        throw std::runtime_error("MJPG decode failed or dimensions do not match negotiated format");
+    return image;
+}
 struct CameraFrame {
     cv::Mat bgr;
-    std::vector<unsigned char> raw_yuyv; // Diagnostic-only copy, disabled during normal inference.
+    std::vector<unsigned char> raw_data; // Diagnostic-only source payload, disabled during normal inference.
+    uint32_t pixel_format=V4L2_PIX_FMT_YUYV;
     unsigned width=0,height=0,stride=0;
     uint32_t sequence=0;
     long long timestamp_ns=0;
@@ -49,6 +63,7 @@ class V4L2Capture {
     struct Buffer {void* data=MAP_FAILED;std::size_t size=0;};
     int fd_=-1;
     bool streaming_=false;
+    uint32_t pixel_format_=V4L2_PIX_FMT_YUYV;
     unsigned width_=0,height_=0,stride_=0;
     std::vector<Buffer> buffers_;
     static int call(int fd,unsigned long request,void* argument) {
@@ -60,7 +75,7 @@ class V4L2Capture {
         const int error=errno;
         return std::runtime_error(operation+": "+std::strerror(error));
     }
-    static bool suitable(int fd,bool require_uvc,const std::string& path) {
+    static bool suitable(int fd,bool require_uvc,const std::string& path,uint32_t required_format=V4L2_PIX_FMT_YUYV) {
         v4l2_capability caps{};
         if(call(fd,VIDIOC_QUERYCAP,&caps)<0) {
             const int error=errno;
@@ -77,7 +92,7 @@ class V4L2Capture {
             return false;
         }
         v4l2_fmtdesc format{};format.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        bool yuyv=false;
+        bool supported=false;
         std::cerr<<" formats=";
         while(call(fd,VIDIOC_ENUM_FMT,&format)==0) {
             for(int byte=0;byte<4;++byte) {
@@ -85,13 +100,13 @@ class V4L2Capture {
                 std::cerr<<(c>=32 && c<127?c:'?');
             }
             std::cerr<<',';
-            if(format.pixelformat==V4L2_PIX_FMT_YUYV) yuyv=true;
+            if(format.pixelformat==required_format) supported=true;
             ++format.index;
         }
-        std::cerr<<(yuyv?" accepted=YUYV":" rejected=missing_YUYV")<<'\n';
-        return yuyv;
+        std::cerr<<(supported?" accepted=":" rejected=missing_")<<capture_format_name(required_format)<<'\n';
+        return supported;
     }
-    static bool probe(const std::string& path,bool require_uvc) {
+    static bool probe(const std::string& path,bool require_uvc,uint32_t required_format=V4L2_PIX_FMT_YUYV) {
         const int fd=open(path.c_str(),O_RDWR|O_NONBLOCK|O_CLOEXEC);
         if(fd<0) {
             const int error=errno;
@@ -99,17 +114,17 @@ class V4L2Capture {
             return false;
         }
         struct Guard{int fd;~Guard(){close(fd);}} guard{fd};
-        return suitable(fd,require_uvc,path);
+        return suitable(fd,require_uvc,path,required_format);
     }
-    static std::string discover() {
+    static std::string discover(uint32_t required_format=V4L2_PIX_FMT_YUYV) {
         std::set<std::string> matches;
         std::error_code error;
         for(const auto& entry:std::filesystem::directory_iterator("/dev",error)) {
             if(entry.path().filename().string().rfind("video",0)!=0) continue;
-            if(probe(entry.path().string(),true)) matches.insert(entry.path().string());
+            if(probe(entry.path().string(),true,required_format)) matches.insert(entry.path().string());
         }
         if(matches.size()!=1) {
-            std::string message="auto camera selection requires one accessible YUYV UVC device; found "+std::to_string(matches.size());
+            std::string message="auto camera selection requires one accessible "+std::string(capture_format_name(required_format))+" UVC device; found "+std::to_string(matches.size());
             for(const auto& path:matches) message+=" "+path;
             throw std::runtime_error(message+"; close other camera users or specify --camera /dev/videoN");
         }
@@ -128,19 +143,21 @@ public:
         if(!probe(path,false)) throw std::runtime_error("camera probe rejected "+path+"; see diagnostics above");
         return path;
     }
-    explicit V4L2Capture(std::string path) {
-        if(path=="auto") path=discover();
+    explicit V4L2Capture(std::string path,uint32_t pixel_format=V4L2_PIX_FMT_YUYV):pixel_format_(pixel_format) {
+        if(pixel_format_!=V4L2_PIX_FMT_YUYV && pixel_format_!=V4L2_PIX_FMT_MJPEG) throw std::runtime_error("unsupported capture format");
+        if(path=="auto") path=discover(pixel_format_);
         try {
             fd_=open(path.c_str(),O_RDWR|O_NONBLOCK|O_CLOEXEC);
             if(fd_<0) throw failure("open camera "+path);
-            if(!suitable(fd_,false,path)) throw std::runtime_error("device does not provide single-plane YUYV streaming capture: "+path);
+            if(!suitable(fd_,false,path,pixel_format_)) throw std::runtime_error("device does not provide requested single-plane streaming capture: "+path);
             v4l2_format format{};format.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
             format.fmt.pix.width=640;format.fmt.pix.height=480;
-            format.fmt.pix.pixelformat=V4L2_PIX_FMT_YUYV;format.fmt.pix.field=V4L2_FIELD_ANY;
+            format.fmt.pix.pixelformat=pixel_format_;format.fmt.pix.field=V4L2_FIELD_ANY;
             if(call(fd_,VIDIOC_S_FMT,&format)<0) throw failure("VIDIOC_S_FMT");
             width_=format.fmt.pix.width;height_=format.fmt.pix.height;stride_=format.fmt.pix.bytesperline;
-            if(format.fmt.pix.pixelformat!=V4L2_PIX_FMT_YUYV || !width_ || !height_ || width_>4096 || height_>4096 || width_%2 || stride_<width_*2)
-                throw std::runtime_error("camera negotiated unsupported YUYV dimensions/stride");
+            if(format.fmt.pix.pixelformat!=pixel_format_ || !width_ || !height_ || width_>4096 || height_>4096 ||
+               (pixel_format_==V4L2_PIX_FMT_YUYV && (width_%2 || stride_<width_*2)))
+                throw std::runtime_error("camera negotiated unsupported format/dimensions/stride");
             v4l2_requestbuffers request{};request.count=4;request.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;request.memory=V4L2_MEMORY_MMAP;
             if(call(fd_,VIDIOC_REQBUFS,&request)<0) throw failure("VIDIOC_REQBUFS");
             if(!request.count || request.count>32) throw std::runtime_error("invalid MMAP buffer count");
@@ -148,7 +165,8 @@ public:
             for(unsigned i=0;i<request.count;++i) {
                 v4l2_buffer buffer{};buffer.type=request.type;buffer.memory=request.memory;buffer.index=i;
                 if(call(fd_,VIDIOC_QUERYBUF,&buffer)<0) throw failure("VIDIOC_QUERYBUF");
-                if(buffer.length<static_cast<std::size_t>(height_-1)*stride_+width_*2) throw std::runtime_error("short MMAP buffer");
+                const std::size_t minimum=pixel_format_==V4L2_PIX_FMT_YUYV?static_cast<std::size_t>(height_-1)*stride_+width_*2:1;
+                if(buffer.length<minimum) throw std::runtime_error("short MMAP buffer");
                 void* address=mmap(nullptr,buffer.length,PROT_READ|PROT_WRITE,MAP_SHARED,fd_,buffer.m.offset);
                 if(address==MAP_FAILED) throw failure("mmap");
                 buffers_[i]={address,buffer.length};
@@ -157,7 +175,7 @@ public:
             v4l2_buf_type type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
             if(call(fd_,VIDIOC_STREAMON,&type)<0) throw failure("VIDIOC_STREAMON");
             streaming_=true;
-            std::cout<<"camera="<<path<<" format=YUYV width="<<width_<<" height="<<height_<<" stride="<<stride_<<" buffers="<<buffers_.size()<<'\n';
+            std::cout<<"camera="<<path<<" format="<<capture_format_name(pixel_format_)<<" width="<<width_<<" height="<<height_<<" stride="<<stride_<<" buffers="<<buffers_.size()<<'\n';
         } catch(...) {release();throw;}
     }
     ~V4L2Capture(){release();}
@@ -195,12 +213,16 @@ public:
             if(buffer.index>=buffers_.size()) throw std::runtime_error("invalid dequeued buffer index");
             const bool valid=(buffer.flags&V4L2_BUF_FLAG_ERROR)==0;
             if(valid) {
-                frame.bgr=copy_yuyv_to_bgr(buffers_[buffer.index].data,buffers_[buffer.index].size,buffer.bytesused,width_,height_,stride_);
+                if(pixel_format_==V4L2_PIX_FMT_YUYV)
+                    frame.bgr=copy_yuyv_to_bgr(buffers_[buffer.index].data,buffers_[buffer.index].size,buffer.bytesused,width_,height_,stride_);
+                else
+                    frame.bgr=copy_mjpeg_to_bgr(buffers_[buffer.index].data,buffers_[buffer.index].size,buffer.bytesused,width_,height_);
+                frame.pixel_format=pixel_format_;
                 frame.width=width_;frame.height=height_;frame.stride=stride_;
                 if(copy_raw) {
                     const auto* data=static_cast<const unsigned char*>(buffers_[buffer.index].data);
-                    frame.raw_yuyv.assign(data,data+buffer.bytesused);
-                } else frame.raw_yuyv.clear();
+                    frame.raw_data.assign(data,data+buffer.bytesused);
+                } else frame.raw_data.clear();
                 frame.sequence=buffer.sequence;
                 frame.monotonic=(buffer.flags&V4L2_BUF_FLAG_TIMESTAMP_MASK)==V4L2_BUF_FLAG_TIMESTAMP_MONOTONIC;
                 frame.start_of_exposure=(buffer.flags&V4L2_BUF_FLAG_TSTAMP_SRC_MASK)==V4L2_BUF_FLAG_TSTAMP_SRC_SOE;

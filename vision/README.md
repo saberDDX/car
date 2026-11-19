@@ -17,12 +17,16 @@ git pull --ff-only
 sh scripts/diagnose-npu-camera.sh
 ```
 
-此程序不加载 RKNN 模型，读取已有结果 JPG 的像素统计，再直接采集 60 帧。
-第 1、30、60 帧各保存推理前的 PNG、原始 `.yuyv` 和尺寸/stride/统计文本。
+此程序不加载 RKNN 模型，读取已有结果 JPG 的像素统计，再顺序采集 YUYV 和 MJPG 各 60 帧。
+每种格式的第 1、30、60 帧各保存推理前 PNG、原始数据和尺寸/stride/统计文本。
+终端显式打印 `format=YUYV frame=60` 和 `format=MJPG frame=60`。
 输出位于新建的 `build/vision/camera-diagnostics/capture-*/`，不会覆盖原结果图。
 `build/vision/camera-diagnostics/latest/` 指向这一轮目录，便于直接打开 `latest/frame-60.png`。
+YUYV 结果仍在根目录；MJPG 结果在 `latest/mjpg/frame-60.png`，
+原始 JPEG 为 `latest/mjpg/frame-60.jpg`，可用系统查看器独立打开。
 控制参数只执行 QUERYCTRL/G_CTRL/QUERYMENU，不写曝光、增益或白平衡值。
-摄像头格式仍为原先的 YUYV 640×480 请求，按返回的尺寸和 stride 解析。
+两种格式均请求 640×480，读取驱动返回的实际参数；YUYV 按 stride 转换，MJPG 按有效字节数解码并校验尺寸。
+每种格式独立 STREAMON/STREAMOFF；某种失败仍尝试另一种，并保留错误。NPU 主程序默认仍为 YUYV。
 权限与其他摄像头脚本相同，仅在需要时临时授权并恢复。
 
 重点看：
@@ -35,6 +39,13 @@ sh scripts/diagnose-npu-camera.sh
 白色原始画面可能来自场景或摄像头设置；若原始 YUYV 有正常变化而转换图发白，
 则继续检查格式/stride/转换。若文件像素正常而查看器仍白，则排查实际打开文件和显示路径。
 这些是后续诊断分支，不是已确认原因。诊断代码的合成白/黑图及 raw 统计测试通过，实板结果待回传。
+
+已收到的 YUYV 诊断确认：保存的 JPG 及 capture-only PNG 都为 100% 纯白，
+原始 Y 为 236～238、U/V 恒为 128；用户确认完全遮住镜头后仍得到相同统计。
+这表明至少在不调用 NPU 时也可复现白色数据，但尚未确认摄像头为何没有正常明暗响应。
+不能由这些统计直接断言硬件损坏或仅为曝光过长；下一步等待 MJPG 对照。
+STREAMON 返回成功和 sequence 增长只证明驱动接受采集并交付帧，不替代正常场景画面验收。
+诊断默认不弹窗，运行数秒后停止；没有窗口或结束后指示灯熄灭不能单独作为未启动的证据。
 
 ## 已收到的板端结果
 

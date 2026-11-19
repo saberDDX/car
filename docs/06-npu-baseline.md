@@ -79,3 +79,5 @@ M0 通过条件：真实板端成功加载匹配的 RKNN 模型、查询 SDK/dri
 见 [摄像头记录](../vision/reports/board-camera-smoke.json)。最后一帧目标数 0，用户随后反馈结果图全白。
 当前先执行 `sh scripts/diagnose-npu-camera.sh`，不调用 NPU，保存原始 YUYV/转换图与只读曝光信息。
 白色原因未确认，图像质量验收未通过；FP/INT8 对比暂缓，尚不将整个视觉模块写为验收完成。
+用户已回传 capture-only 原始 YUYV：Y=236～238，U/V=128，转换得到全白；完全遮镜头后统计仍相同。
+已准备同设备 MJPG 对照，以区分格式路径与相机源状态；不调用 NPU、不写曝光控制，结果待板端运行。
