@@ -1,0 +1,16 @@
+{
+  "date": "2026-11-19",
+  "source": "User-pasted board output",
+  "application_commit": "07e90ebd441584ea3b667eea44d6e14263565a33",
+  "ctest": "2/2 passed",
+  "model_checksum_checks": "FP and INT8 OK",
+  "model_init_ms": 27.6227,
+  "runtime": "2.1.0 (967d001cc8@2024-08-07T19:28:19)",
+  "driver": "0.9.8",
+  "stage_failed": "automatic camera discovery",
+  "error": "auto camera selection requires one accessible YUYV UVC device; found 0",
+  "frames_captured": 0,
+  "cause": "NOT_CONFIRMED: initial discovery discarded open/capability/format errors",
+  "code_review_finding": "Existing Qt launcher grants a temporary scoped camera ACL; first NPU launcher omitted this integration",
+  "follow_up": "Add per-device diagnostics and scoped ACL handling; require a new board run to establish the actual cause and capture result"
+}

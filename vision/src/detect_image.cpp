@@ -291,6 +291,11 @@ int execute(const Options& opt) {
 }
 int main(int argc,char** argv) {
     std::signal(SIGINT,stop_handler);std::signal(SIGTERM,stop_handler);
+    if((argc==2 && std::string(argv[1])=="--find-camera") ||
+       (argc==3 && std::string(argv[1])=="--probe-camera")) {
+        try {std::cout<<carvision::V4L2Capture::find_device(argc==3?argv[2]:"auto")<<'\n';return 0;}
+        catch(const std::exception& error){std::cerr<<"ERROR: "<<error.what()<<'\n';return 1;}
+    }
     try{return execute(options(argc,argv));}
     catch(const std::exception& error) {
         std::cerr<<"ERROR: "<<error.what()<<"\nUsage: detect_image --model FILE (--image FILE | --camera auto|/dev/videoN) [--output FILE] [--library FILE]"

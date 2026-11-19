@@ -72,5 +72,7 @@ M0 通过条件：真实板端成功加载匹配的 RKNN 模型、查询 SDK/dri
 两份 RK3576 模型已转换，云端编译、后处理与 PyTorch/ONNX 对照通过。
 详细证据与运行步骤见 [vision/README.md](../vision/README.md)。
 用户已执行 `sh scripts/run-npu-image.sh`，M0 的模型加载、实际版本查询与样例推理条件通过。
-接下来执行 `sh scripts/run-npu-camera.sh`；单线程 V4L2 接入代码已云端编译/测试，尚未实板运行。
+接下来执行 `sh scripts/run-npu-camera.sh`；单线程 V4L2 接入代码已云端编译/测试，完整采集链路待实板验收。
+首次真实摄像头尝试停在自动发现 `found 0`，没有采集帧；具体打开/能力错误当时未记录。
+新版本补齐诊断和与原 Qt 相同原则的临时 ACL 流程，等待板端再次验证，失败记录保留。
 FP/INT8 板端效果/性能比较待进行，尚不将整个视觉模块写为验收完成。

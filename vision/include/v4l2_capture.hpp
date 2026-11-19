@@ -58,29 +58,52 @@ class V4L2Capture {
         const int error=errno;
         return std::runtime_error(operation+": "+std::strerror(error));
     }
-    static bool suitable(int fd,bool require_uvc) {
+    static bool suitable(int fd,bool require_uvc,const std::string& path) {
         v4l2_capability caps{};
-        if(call(fd,VIDIOC_QUERYCAP,&caps)<0) return false;
+        if(call(fd,VIDIOC_QUERYCAP,&caps)<0) {
+            const int error=errno;
+            std::cerr<<"camera_probe device="<<path<<" querycap_errno="<<error<<" error="<<std::strerror(error)<<'\n';
+            return false;
+        }
         const unsigned features=(caps.capabilities&V4L2_CAP_DEVICE_CAPS)?caps.device_caps:caps.capabilities;
+        const std::string driver(reinterpret_cast<const char*>(caps.driver),strnlen(reinterpret_cast<const char*>(caps.driver),sizeof(caps.driver)));
+        std::cerr<<"camera_probe device="<<path<<" driver="<<driver;
         if(!(features&V4L2_CAP_VIDEO_CAPTURE) || !(features&V4L2_CAP_STREAMING) ||
-           (require_uvc && std::strncmp(reinterpret_cast<const char*>(caps.driver),"uvcvideo",sizeof(caps.driver))!=0)) return false;
+           (require_uvc && driver!="uvcvideo")) {
+            std::cerr<<" rejected=not_required_capture_streaming_uvc\n";
+            return false;
+        }
         v4l2_fmtdesc format{};format.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        bool yuyv=false;
+        std::cerr<<" formats=";
         while(call(fd,VIDIOC_ENUM_FMT,&format)==0) {
-            if(format.pixelformat==V4L2_PIX_FMT_YUYV) return true;
+            for(int byte=0;byte<4;++byte) {
+                const char c=static_cast<char>((format.pixelformat>>(8*byte))&0xff);
+                std::cerr<<(c>=32 && c<127?c:'?');
+            }
+            std::cerr<<',';
+            if(format.pixelformat==V4L2_PIX_FMT_YUYV) yuyv=true;
             ++format.index;
         }
-        return false;
+        std::cerr<<(yuyv?" accepted=YUYV":" rejected=missing_YUYV")<<'\n';
+        return yuyv;
+    }
+    static bool probe(const std::string& path,bool require_uvc) {
+        const int fd=open(path.c_str(),O_RDWR|O_NONBLOCK|O_CLOEXEC);
+        if(fd<0) {
+            const int error=errno;
+            std::cerr<<"camera_probe device="<<path<<" open_errno="<<error<<" error="<<std::strerror(error)<<'\n';
+            return false;
+        }
+        struct Guard{int fd;~Guard(){close(fd);}} guard{fd};
+        return suitable(fd,require_uvc,path);
     }
     static std::string discover() {
         std::set<std::string> matches;
         std::error_code error;
         for(const auto& entry:std::filesystem::directory_iterator("/dev",error)) {
             if(entry.path().filename().string().rfind("video",0)!=0) continue;
-            const int fd=open(entry.path().c_str(),O_RDWR|O_NONBLOCK|O_CLOEXEC);
-            if(fd<0) continue;
-            const bool found=suitable(fd,true);
-            close(fd);
-            if(found) matches.insert(entry.path().string());
+            if(probe(entry.path().string(),true)) matches.insert(entry.path().string());
         }
         if(matches.size()!=1) {
             std::string message="auto camera selection requires one accessible YUYV UVC device; found "+std::to_string(matches.size());
@@ -96,12 +119,18 @@ class V4L2Capture {
         if(fd_>=0) {close(fd_);fd_=-1;}
     }
 public:
+    // QUERYCAP/ENUM_FMT only: no S_FMT, buffer allocation, capture or NPU calls.
+    static std::string find_device(const std::string& path="auto") {
+        if(path=="auto") return discover();
+        if(!probe(path,false)) throw std::runtime_error("camera probe rejected "+path+"; see diagnostics above");
+        return path;
+    }
     explicit V4L2Capture(std::string path) {
         if(path=="auto") path=discover();
         try {
             fd_=open(path.c_str(),O_RDWR|O_NONBLOCK|O_CLOEXEC);
             if(fd_<0) throw failure("open camera "+path);
-            if(!suitable(fd_,false)) throw std::runtime_error("device does not provide single-plane YUYV streaming capture: "+path);
+            if(!suitable(fd_,false,path)) throw std::runtime_error("device does not provide single-plane YUYV streaming capture: "+path);
             v4l2_format format{};format.type=V4L2_BUF_TYPE_VIDEO_CAPTURE;
             format.fmt.pix.width=640;format.fmt.pix.height=480;
             format.fmt.pix.pixelformat=V4L2_PIX_FMT_YUYV;format.fmt.pix.field=V4L2_FIELD_ANY;
