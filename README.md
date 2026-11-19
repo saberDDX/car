@@ -5,6 +5,8 @@
 
 [完整项目清单](docs/00-project-inventory.md) · [BSP 最终验收、代码重点与简历](docs/05h-bsp-acceptance-and-study.md) · [BSP 任务与范围](docs/05-rk3576-bsp-practice.md)
 
+[RK3576 NPU 视觉检测扩展](vision/README.md)：位于 `dev/npu-baseline`，已有模型导出/转换、C++ 图片推理与云端检查；板端推理、摄像头接入和量化性能验收待完成。
+
 - [模块编译、加载与卸载基线](docs/01-driver-baseline.md)：板卡已通过。
 - [GPIO 按键驱动、设备树与硬件验收](docs/02-gpio-key.md)：20 次按下/松开、长按及卸载重载已通过。
 - [K1 打开 Qt 摄像头及对应知识点](docs/03-qt-camera-key.md)：板卡实时画面、单窗口及三次关闭重开已通过。

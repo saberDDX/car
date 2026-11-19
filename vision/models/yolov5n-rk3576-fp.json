@@ -1,0 +1,10 @@
+{
+  "target": "rk3576",
+  "toolkit": "2.1.0+708089d1",
+  "dtype": "fp",
+  "onnx_sha256": "f86cbfde769dc0b89b456f02380e2fa7f502f14d8b69e2d2f80f68eea0842280",
+  "rknn_sha256": "99f5f550059f7b3229741d14eeccf2fc7c5aa4485c3c21d72415c87470e0a8eb",
+  "input": "RGB uint8 NHWC at runtime; embedded /255 normalization",
+  "calibration": [],
+  "board_validation": "NOT_RUN"
+}

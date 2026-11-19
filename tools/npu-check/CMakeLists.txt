@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.16)
+project(car_npu_check LANGUAGES CXX)
+add_executable(check_runtime check_runtime.cpp)
+target_compile_features(check_runtime PRIVATE cxx_std_11)
+target_compile_options(check_runtime PRIVATE -Wall -Wextra -Wpedantic)
+target_link_libraries(check_runtime PRIVATE ${CMAKE_DL_LIBS})

@@ -1,0 +1,47 @@
+{
+  "source_commit": "23a20ef3e5fa648e765e4a70b30edbfd3aaf8c8c",
+  "weights_sha256": "4f180cf23ba0717ada0badd6c685026d73d48f184d00fc159c2641284b2ac0a3",
+  "onnx_sha256": "f86cbfde769dc0b89b456f02380e2fa7f502f14d8b69e2d2f80f68eea0842280",
+  "torch": "2.1.0+cpu",
+  "onnx": "1.14.1",
+  "onnxruntime": "1.16.0",
+  "reference_image_sha256": "fb4914d123d97c440cd127ef0e98d4bdc68cd88e2683657528928b4a34014e16",
+  "comparison": "adapted PyTorch sigmoid heads versus ONNX Runtime, one fixed image",
+  "head_errors": [
+    {
+      "stride": 8,
+      "shape": [
+        1,
+        255,
+        80,
+        80
+      ],
+      "max_abs": 3.993511199951172e-06,
+      "mean_abs": 4.1777141746024427e-08
+    },
+    {
+      "stride": 16,
+      "shape": [
+        1,
+        255,
+        40,
+        40
+      ],
+      "max_abs": 2.771615982055664e-06,
+      "mean_abs": 4.0753178609520546e-08
+    },
+    {
+      "stride": 32,
+      "shape": [
+        1,
+        255,
+        20,
+        20
+      ],
+      "max_abs": 3.2782554626464844e-06,
+      "mean_abs": 3.874314558061087e-08
+    }
+  ],
+  "preprocessing": "RGB, black letterbox, NCHW float32 /255",
+  "opset": 12
+}
