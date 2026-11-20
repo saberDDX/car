@@ -2,7 +2,7 @@
   "date": "2026-11-19",
   "source": "User reported result-camera.jpg is blank/white and attached an image showing a white view",
   "original_jpeg_available_in_cloud": false,
-  "status": "OPEN",
+  "status": "PREVIEW_RECOVERED_NPU_RETEST_PENDING",
   "previous_transport_result": "105 frames processed and inference calls completed; no sequence gaps observed in the short run",
   "image_quality_acceptance": "NOT_PASSED",
   "cause": "NOT_CONFIRMED",
@@ -30,6 +30,13 @@
     "power_cycle_status": "USB disconnect/reconnect was requested; user has not explicitly confirmed performing it",
     "scope": "Both formats produce near-white images on this board; hardware versus host/driver/control cause remains unconfirmed"
   },
-  "next_step": "Test the same USB camera on a separate computer using its system camera application. If available, test a known-good second camera on the board. Avoid further NPU or display changes until the image source is isolated",
-  "quantization_comparison": "deferred until capture image is usable"
+  "subsequent_user_feedback": [
+    "Same camera initially white on a separate computer too",
+    "After wiping dust and reconnecting, user reports normal picture on the computer; causality not established",
+    "On the board, Qt initially showed white, then recovered to normal live video; manual close/reopen immediately showed normal video"
+  ],
+  "recovery_scope": "User-confirmed Qt live preview only; startup white interval duration and root cause unknown, normal-scene NPU camera detection not yet retested",
+  "key_behavior": "K1 opens/raises the camera window; it does not toggle closed. User explicitly asked to keep this behavior and resume NPU work",
+  "next_step": "Retest NPU camera detection with a normal scene and preview, then run the prepared fixed-image FP/INT8 comparison. Do not use earlier white-frame throughput as valid-scene detection performance",
+  "quantization_comparison": "ready to run on board; no results received yet"
 }

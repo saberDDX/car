@@ -5,7 +5,7 @@
 
 [完整项目清单](docs/00-project-inventory.md) · [BSP 最终验收、代码重点与简历](docs/05h-bsp-acceptance-and-study.md) · [BSP 任务与范围](docs/05-rk3576-bsp-practice.md)
 
-[RK3576 NPU 视觉检测扩展](vision/README.md)：位于 `dev/npu-baseline`，板端 INT8 静态图通过；摄像头 100 帧运行后用户反馈结果全白，当前定位图像质量问题，暂不将该短跑视为有效检测性能验收。
+[RK3576 NPU 视觉检测扩展](vision/README.md)：位于 `dev/npu-baseline`，板端 INT8 静态图通过；白屏排查后用户确认 Qt 实时画面恢复，首次打开仍有短暂白屏。下一步复验正常场景 NPU 摄像头检测、完成同图 FP/INT8 对比，早先白帧短跑不作为有效检测性能验收。
 
 - [模块编译、加载与卸载基线](docs/01-driver-baseline.md)：板卡已通过。
 - [GPIO 按键驱动、设备树与硬件验收](docs/02-gpio-key.md)：20 次按下/松开、长按及卸载重载已通过。
