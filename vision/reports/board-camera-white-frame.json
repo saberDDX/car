@@ -2,9 +2,9 @@
   "date": "2026-11-19",
   "source": "User reported result-camera.jpg is blank/white and attached an image showing a white view",
   "original_jpeg_available_in_cloud": false,
-  "status": "QT_PREVIEW_RECOVERED_NPU_VISUAL_CHECK_PENDING",
+  "status": "LIVE_PERSON_DETECTION_CONFIRMED_ROOT_CAUSE_UNKNOWN",
   "previous_transport_result": "105 frames processed and inference calls completed; no sequence gaps observed in the short run",
-  "image_quality_acceptance": "NOT_PASSED",
+  "image_quality_acceptance": "Later live preview with person boxes confirmed by user; original white-frame failure retained",
   "cause": "NOT_CONFIRMED",
   "pixel_statistics_source": "User-pasted capture-only diagnostics; original JPEG bytes remain unavailable in cloud",
   "previous_result": {"size": [640,480], "mean_BGR": [255,255,255], "std_BGR": [0,0,0], "near_white_percent": 100},
@@ -33,10 +33,11 @@
   "subsequent_user_feedback": [
     "Same camera initially white on a separate computer too",
     "After wiping dust and reconnecting, user reports normal picture on the computer; causality not established",
-    "On the board, Qt initially showed white, then recovered to normal live video; manual close/reopen immediately showed normal video"
+    "On the board, Qt initially showed white, then recovered to normal live video; manual close/reopen immediately showed normal video",
+    "User subsequently confirmed normal NPU preview showing themselves with green boxes. Household objects absent from boxes were cup, cell phone and chair, excluded by default class filtering"
   ],
-  "recovery_scope": "User-confirmed Qt live preview. NPU subsequently completed 900 measured frames, but user did not identify its independent preview window; NPU image/box visual acceptance remains pending. Startup white root cause unknown",
+  "recovery_scope": "User-confirmed Qt preview and subsequent NPU live preview with person boxes. Original startup white-frame root cause unknown; no claim of long-term stability or live vehicle acceptance",
   "key_behavior": "K1 opens/raises the camera window; it does not toggle closed. User explicitly asked to keep this behavior and resume NPU work",
-  "next_step": "Explain the separate OpenCV preview and verify normal live image and person boxes from a VNC desktop terminal; keep old Qt app closed. See board-validation-2026-11-20.json",
+  "next_step": "Retain evidence and fixed person/vehicle scope; no further white-frame diagnosis required unless it recurs. See board-validation-2026-11-20.json for measurements and subsequent visual confirmation",
   "quantization_comparison": "Completed on board and user-pasted summary archived; one fixed image, not dataset accuracy"
 }

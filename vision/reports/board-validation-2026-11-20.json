@@ -39,7 +39,16 @@
     "camera_run": "COMPLETED",
     "single_thread": true,
     "preview": "Requested by the supplied auto 900 1 command, but not independently printed in pasted log; user did not identify a preview window",
-    "visual_acceptance": "PENDING; user did not know where the camera preview was displayed",
+    "visual_acceptance": "This 900-frame run was not visually confirmed at the time. A subsequent preview check was confirmed by the user; see visual_followup",
+    "visual_followup": {
+      "date": "2026-11-20",
+      "source": "User explicitly reports seeing themselves and green detection boxes in the preview",
+      "person_live_detection": "USER_CONFIRMED",
+      "other_objects_reported": ["cup", "cell phone", "chair"],
+      "explanation": "Default classes [0,2,3,5,7] include person/car/motorcycle/bus/truck, excluding these household objects. Source supports --classes all, but no default or model change was made",
+      "vehicle_live_detection": "NOT_REPORTED; the earlier bus.jpg static-image test detected a bus",
+      "scope": "Functional visual check; no new completed-frame count, timing, screenshot or detection coordinates supplied. Does not retroactively prove the scene content of every frame of the earlier 900-frame run"
+    },
     "limits": [
       "Last-frame detections=0 says nothing about detections on earlier frames",
       "Sequence gaps sum to 8 missing sequence numbers between observed frames; not a count of gap events or proof of USB packet loss",
