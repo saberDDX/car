@@ -2,7 +2,7 @@
   "date": "2026-11-19",
   "source": "User reported result-camera.jpg is blank/white and attached an image showing a white view",
   "original_jpeg_available_in_cloud": false,
-  "status": "PREVIEW_RECOVERED_NPU_RETEST_PENDING",
+  "status": "QT_PREVIEW_RECOVERED_NPU_VISUAL_CHECK_PENDING",
   "previous_transport_result": "105 frames processed and inference calls completed; no sequence gaps observed in the short run",
   "image_quality_acceptance": "NOT_PASSED",
   "cause": "NOT_CONFIRMED",
@@ -35,8 +35,8 @@
     "After wiping dust and reconnecting, user reports normal picture on the computer; causality not established",
     "On the board, Qt initially showed white, then recovered to normal live video; manual close/reopen immediately showed normal video"
   ],
-  "recovery_scope": "User-confirmed Qt live preview only; startup white interval duration and root cause unknown, normal-scene NPU camera detection not yet retested",
+  "recovery_scope": "User-confirmed Qt live preview. NPU subsequently completed 900 measured frames, but user did not identify its independent preview window; NPU image/box visual acceptance remains pending. Startup white root cause unknown",
   "key_behavior": "K1 opens/raises the camera window; it does not toggle closed. User explicitly asked to keep this behavior and resume NPU work",
-  "next_step": "Retest NPU camera detection with a normal scene and preview, then run the prepared fixed-image FP/INT8 comparison. Do not use earlier white-frame throughput as valid-scene detection performance",
-  "quantization_comparison": "ready to run on board; no results received yet"
+  "next_step": "Explain the separate OpenCV preview and verify normal live image and person boxes from a VNC desktop terminal; keep old Qt app closed. See board-validation-2026-11-20.json",
+  "quantization_comparison": "Completed on board and user-pasted summary archived; one fixed image, not dataset accuracy"
 }

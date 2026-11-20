@@ -8,9 +8,10 @@
 - `SHA256SUMS` 与同名 JSON：模型摘要、工具链与校准输入记录。
 
 INT8 模型已由用户在 RK3576 回传一次真实静态图推理成功记录，
-见 [板端记录](../reports/board-int8-smoke.json)。非量化模型板端运行仍待验证。
-INT8 另已完成 100 帧摄像头采集/推理短跑，见 [摄像头记录](../reports/board-camera-smoke.json)，
-最后一帧无检测目标，场景内容待核对。两者的完整精度对比和稳定性能仍待完成。
+见 [板端记录](../reports/board-int8-smoke.json)。2026-11-20 非量化与 INT8 模型也完成了板端同图对比，
+rknn_run 均值为 21.324/11.066 ms，单图 4 对框匹配；不代表数据集精度无损。
+INT8 另完成 900 帧摄像头测量，实际画面和实时检测框仍待用户视觉核对。
+见 [最新记录](../reports/board-validation-2026-11-20.json)。两者的标注集精度对比和长时稳定性能仍未完成。
 原始权重为官方 YOLOv5 v6.2 `yolov5n.pt`，SHA-256：
 `4f180cf23ba0717ada0badd6c685026d73d48f184d00fc159c2641284b2ac0a3`。
 来源：https://github.com/ultralytics/yolov5/releases/download/v6.2/yolov5n.pt 。

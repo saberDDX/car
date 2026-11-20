@@ -87,3 +87,9 @@ MJPG 第 60 帧 BGR 均值约 253.489、标准差约 0.565；不能仅用 Qt 显
 下一步使用 `sh scripts/run-npu-camera.sh auto 900 1` 复验真实场景推理，
 再执行 `sh scripts/compare-npu-models.sh` 完成已准备的 FP/INT8 对比。
 此前白帧 FPS 仍不作为有效场景性能；摄像头恢复不等于 NPU 检测已经重新通过。
+
+2026-11-20 用户回传后续 900 帧和 FP/INT8 对比结果，见
+[实测归档](../vision/reports/board-validation-2026-11-20.json)与[结果/复习入口](07-npu-results-and-study.md)。
+非量化/INT8 rknn_run 均值 21.324/11.066 ms，同图 4 对检测框匹配；量化对比运行已完成。
+摄像头吞吐约 29.666 FPS，但有 8 个缺失 sequence 编号；用户未认出独立预览窗口，
+实际画面与实时检测框仍需视觉核对。旧 Qt 必须关闭，NPU 程序通过 OpenCV 打开自己的独立预览。

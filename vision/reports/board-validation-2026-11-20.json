@@ -1,0 +1,81 @@
+{
+  "date": "2026-11-20",
+  "source": "User-pasted board terminal output; not cloud hardware measurements",
+  "application_commit": "NOT_REPORTED; preceding pushed revision was a67ce9c",
+  "platform": "LubanCat-3 RK3576",
+  "camera": {
+    "device": "/dev/video0",
+    "driver": "uvcvideo",
+    "card": "UVC Camera (046d:0825)",
+    "access": "existing; temporary ACL restore not exercised",
+    "format": "YUYV",
+    "width": 640,
+    "height": 480,
+    "stride": 1280,
+    "mmap_buffers": 4,
+    "runtime": "2.1.0 (967d001cc8@2024-08-07T19:28:19)",
+    "rknpu_driver": "0.9.8",
+    "model_init_ms": 142.912,
+    "warmup": 5,
+    "processed": 905,
+    "measured": 900,
+    "timing_ms": {
+      "preprocess": {"mean": 1.276, "p50": 1.315, "p95": 1.477, "max": 2.058},
+      "input_set": {"mean": 0.654, "p50": 0.684, "p95": 0.766, "max": 0.988},
+      "rknn_run": {"mean": 10.545, "p50": 10.346, "p95": 11.721, "max": 14.746},
+      "output_get": {"mean": 6.107, "p50": 6.307, "p95": 6.641, "max": 8.535},
+      "postprocess": {"mean": 1.400, "p50": 1.465, "p95": 1.782, "max": 2.044},
+      "processing": {"mean": 19.983, "p50": 20.202, "p95": 21.531, "max": 24.745},
+      "capture_wait_convert": {"mean": 10.525, "p50": 9.202, "p95": 15.939, "max": 47.892},
+      "driver_timestamp_to_postprocess": {"mean": 54.298, "p50": 53.459, "p95": 57.793, "max": 95.240}
+    },
+    "driver_timestamp": {"monotonic": true, "source": "SOE"},
+    "completed_detection_fps": 29.666,
+    "measured_wall_seconds": 30.338,
+    "sequence_gaps": 8,
+    "sequence_anomalies": 0,
+    "last_frame_detections": 0,
+    "output": "/home/cat/car-driver-dev/build/vision/result-camera.jpg",
+    "camera_run": "COMPLETED",
+    "single_thread": true,
+    "preview": "Requested by the supplied auto 900 1 command, but not independently printed in pasted log; user did not identify a preview window",
+    "visual_acceptance": "PENDING; user did not know where the camera preview was displayed",
+    "limits": [
+      "Last-frame detections=0 says nothing about detections on earlier frames",
+      "Sequence gaps sum to 8 missing sequence numbers between observed frames; not a count of gap events or proof of USB packet loss",
+      "Processing time excludes acquisition, output release, drawing/display and initialization",
+      "Driver timestamp age is not glass-to-glass latency",
+      "Approximately 30 seconds of measurement; no long-term memory/stability claim"
+    ]
+  },
+  "paired_image_comparison": {
+    "scope": "One fixed bus.jpg image; no labeled dataset accuracy or mAP evaluation",
+    "order": ["fp", "int8", "int8", "fp"],
+    "warmup_per_run": 10,
+    "measured_per_run": 100,
+    "counts_source": "Fixed comparison script configuration; completion summarized by user-pasted output",
+    "runs": [
+      {"dtype": "fp", "rknn_run_mean_ms": 21.385, "processing_mean_ms": 46.614, "detections": 4},
+      {"dtype": "int8", "rknn_run_mean_ms": 11.026, "processing_mean_ms": 18.128, "detections": 4},
+      {"dtype": "int8", "rknn_run_mean_ms": 11.105, "processing_mean_ms": 18.079, "detections": 4},
+      {"dtype": "fp", "rknn_run_mean_ms": 21.263, "processing_mean_ms": 46.519, "detections": 4}
+    ],
+    "reported_summary": {
+      "fp": {"rknn_run_mean_ms": 21.324, "processing_mean_ms": 46.566, "model_bytes": 6953815},
+      "int8": {"rknn_run_mean_ms": 11.066, "processing_mean_ms": 18.104, "model_bytes": 4990923}
+    },
+    "derived_from_rounded_summary": {
+      "rknn_run_fp_divided_by_int8": 1.92698,
+      "processing_fp_divided_by_int8": 2.57214,
+      "model_size_reduction_percent": 28.22756
+    },
+    "single_image_matching": {"matched": 4, "unmatched_fp": 0, "unmatched_int8": 0, "method": "Same class and IoU >= 0.5, greedy one-to-one; neither model is ground truth"},
+    "board_full_report": "/home/cat/car-driver-dev/build/vision/comparisons/comparison-t60hkls5/report.json",
+    "full_report_received_in_cloud": false,
+    "limits": [
+      "Full per-run logs, output images, per-segment comparison metrics, individual matches and P95 values not supplied",
+      "Matching four boxes on one image does not establish no quantization accuracy loss",
+      "Only two runs per model; no statistical significance claim"
+    ]
+  }
+}
